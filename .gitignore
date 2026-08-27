@@ -75,5 +75,5 @@ rural_zones/*.mp4
 LIGA_ACAD_V1_MVP/aplicacao-web/rural_zones/*.mp4
 LIGA_ACAD_V1_MVP/aplicacao-web/patches/*.mp4
 
-# Local dev media (temporary; production uses external storage URLs)
-LIGA_ACAD_V1_MVP/aplicacao-web/client/public/media/
+# Raw hero footage is kept locally; optimized public media remains versioned.
+LIGA_ACAD_V1_MVP/aplicacao-web/client/public/media/sigar-hero.mp4
