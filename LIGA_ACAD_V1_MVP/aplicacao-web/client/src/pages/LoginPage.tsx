@@ -1,9 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { BackgroundVideo } from "@/components/landing/BackgroundVideo";
-import { startLogin } from "@/const";
 import { supportsRouteViewTransitions, useViewTransitionNavigate } from "@/hooks/useViewTransitionNavigate";
+import { trpc } from "@/lib/trpc";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 const FALLBACK_EXIT_MS = 650;
 
@@ -14,6 +15,15 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false);
   const exitTimerRef = useRef<number | null>(null);
+  const utils = trpc.useUtils();
+  const demoLogin = trpc.auth.demoLogin.useMutation({
+    onSuccess: user => {
+      utils.auth.me.setData(undefined, user);
+      toast.success("Acesso demonstrativo iniciado.");
+      navigate("/dashboard");
+    },
+    onError: error => toast.error(error.message),
+  });
 
   useEffect(() => {
     if (!loading && isAuthenticated) navigate("/dashboard");
@@ -27,7 +37,14 @@ export default function LoginPage() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    startLogin();
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+    if (!email || !password) {
+      toast.error("Preencha o e-mail e a senha para continuar.");
+      return;
+    }
+    demoLogin.mutate({ email, remember });
   };
 
   const handleBack = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -98,7 +115,7 @@ export default function LoginPage() {
             </p>
             <p className="inline-flex items-center gap-2 whitespace-nowrap font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-field">
               <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" />
-              Área segura
+              Modo demonstrativo
             </p>
           </div>
 
@@ -160,24 +177,35 @@ export default function LoginPage() {
                   />
                   Manter conectado
                 </label>
-                <button type="button" onClick={() => startLogin()} className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field">
+                <button
+                  type="button"
+                  onClick={() => toast.info("A recuperação de senha será conectada na etapa de autenticação.")}
+                  className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+                >
                   Esqueci minha senha
                 </button>
               </div>
 
               <button
                 type="submit"
+                disabled={demoLogin.isPending}
                 className="group relative flex h-13 w-full items-center justify-between overflow-hidden border border-field bg-field px-5 text-left font-semibold text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand"
               >
                 <span className="absolute inset-0 origin-left scale-x-0 bg-paper transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100" />
-                <span className="relative z-10 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field">Entrar</span>
+                <span className="relative z-10 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field">
+                  {demoLogin.isPending ? "Entrando..." : "Entrar"}
+                </span>
                 <ArrowRight aria-hidden="true" className="relative z-10 h-4 w-4 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field" />
               </button>
             </form>
 
             <p className="mt-7 text-sm text-graphite/60">
               Ainda não possui acesso?{" "}
-              <button type="button" onClick={() => startLogin()} className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field">
+              <button
+                type="button"
+                onClick={() => toast.success("Solicitação demonstrativa registrada.")}
+                className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+              >
                 Solicitar acesso
               </button>
             </p>

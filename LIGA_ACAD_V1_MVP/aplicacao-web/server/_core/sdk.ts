@@ -4,8 +4,10 @@ import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
+import { randomBytes } from "node:crypto";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { buildDemoUser, isDemoOpenId } from "../demo";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -17,6 +19,8 @@ import type {
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
+
+const EPHEMERAL_SESSION_SECRET = randomBytes(32).toString("hex");
 
 export type SessionPayload = {
   openId: string;
@@ -154,7 +158,7 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || EPHEMERAL_SESSION_SECRET;
     return new TextEncoder().encode(secret);
   }
 
@@ -283,6 +287,10 @@ class SDKServer {
         throw ForbiddenError("Cron session missing task_uid");
       }
       return buildCronUser(userInfo);
+    }
+
+    if (isDemoOpenId(session.openId)) {
+      return buildDemoUser(session.openId, session.name);
     }
 
     const sessionUserId = session.openId;

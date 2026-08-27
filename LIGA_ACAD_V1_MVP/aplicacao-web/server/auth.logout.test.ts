@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
-import { COOKIE_NAME } from "../shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
 
 type CookieCall = {
@@ -55,6 +55,47 @@ describe("auth.logout", () => {
       maxAge: -1,
       secure: true,
       sameSite: "none",
+      httpOnly: true,
+      path: "/",
+    });
+  });
+});
+
+describe("auth.demoLogin", () => {
+  it("creates a local illustrative session with a browser-compatible cookie", async () => {
+    const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+    const ctx: TrpcContext = {
+      user: null,
+      req: {
+        protocol: "http",
+        headers: {},
+      } as TrpcContext["req"],
+      res: {
+        cookie: (name: string, value: string, options: Record<string, unknown>) => {
+          cookies.push({ name, value, options });
+        },
+      } as TrpcContext["res"],
+    };
+    const caller = appRouter.createCaller(ctx);
+
+    const user = await caller.auth.demoLogin({
+      email: "teste.sigar@example.com",
+      remember: true,
+    });
+
+    expect(user).toMatchObject({
+      email: "teste.sigar@example.com",
+      name: "Teste Sigar",
+      loginMethod: "demonstracao",
+      role: "user",
+    });
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0]?.name).toBe(COOKIE_NAME);
+    expect(cookies[0]?.value).toEqual(expect.any(String));
+    expect(cookies[0]?.options).toMatchObject({
+      maxAge: ONE_YEAR_MS,
+      secure: false,
+      sameSite: "lax",
       httpOnly: true,
       path: "/",
     });
