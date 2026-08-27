@@ -1,45 +1,52 @@
-import { Skeleton } from './ui/skeleton';
+import { Skeleton } from "./ui/skeleton";
 
 export function DashboardLayoutSkeleton() {
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar skeleton */}
-      <div className="w-[280px] border-r border-border bg-background p-4 space-y-6">
-        {/* Logo area */}
-        <div className="flex items-center gap-3 px-2">
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-4 w-24" />
+    <div className="flex min-h-svh bg-background">
+      <aside className="relative hidden w-[268px] shrink-0 border-r border-olive/30 bg-field p-5 md:block">
+        <div className="flex items-center gap-3 border-b border-sand/20 pb-5">
+          <Skeleton className="h-9 w-9 rounded-none bg-sand/20" />
+          <Skeleton className="h-5 w-24 rounded-none bg-sand/20" />
         </div>
 
-        {/* Menu items */}
-        <div className="space-y-2 px-2">
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
+        <div className="mt-8 space-y-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton
+              className="h-11 w-full rounded-none bg-sand/15"
+              key={index}
+            />
+          ))}
         </div>
 
-        {/* User profile area at bottom */}
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex items-center gap-3 px-1">
-            <Skeleton className="h-9 w-9 rounded-full" />
+        <div className="absolute inset-x-5 bottom-5 border-t border-sand/20 pt-5">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-full bg-sand/20" />
             <div className="flex-1 space-y-2">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-2 w-32" />
+              <Skeleton className="h-3 w-20 rounded-none bg-sand/20" />
+              <Skeleton className="h-2 w-32 rounded-none bg-sand/15" />
             </div>
           </div>
         </div>
-      </div>
+      </aside>
 
-      {/* Main content skeleton */}
-      <div className="flex-1 p-4 space-y-4">
-        {/* Content blocks */}
-        <Skeleton className="h-12 w-48 rounded-lg" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
-        </div>
-        <Skeleton className="h-64 rounded-xl" />
+      <div className="min-w-0 flex-1">
+        <header className="flex h-16 items-center justify-between border-b border-olive/25 px-5 lg:px-8">
+          <Skeleton className="h-4 w-36 rounded-none" />
+          <Skeleton className="h-9 w-52 rounded-none" />
+        </header>
+
+        <main className="space-y-7 p-5 lg:p-8">
+          <div className="space-y-3 border-b border-olive/25 pb-7">
+            <Skeleton className="h-9 w-52 rounded-none" />
+            <Skeleton className="h-4 w-80 max-w-full rounded-none" />
+          </div>
+          <div className="grid gap-px bg-olive/25 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton className="h-32 rounded-none" key={index} />
+            ))}
+          </div>
+          <Skeleton className="h-72 rounded-none" />
+        </main>
       </div>
     </div>
   );

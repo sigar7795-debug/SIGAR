@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -6,7 +6,8 @@
 
 @theme inline {
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -29,79 +30,149 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Financial state colors — used for cash-flow/result indicators, not generic UI */
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  --color-negative: var(--negative);
+  --color-negative-foreground: var(--negative-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* SIGAR marketing palette — shared by the public homepage and, where noted, reused
+     as platform tokens above so the two surfaces read as one brand. */
+  --color-graphite: #161c19;
+  --color-field: #34452f;
+  --color-olive: #737653;
+  --color-sage: #a4ad98;
+  --color-sand: #e7e3d9;
+  --color-paper: #f8f7f2;
+  --color-sky: #b8c6d2;
 }
 
 :root {
-  --radius: 0.85rem;
-  --background: #061619;
-  --foreground: #f7fafc;
-  --card: #0a2023;
-  --card-foreground: #f7fafc;
-  --popover: #0b2024;
-  --popover-foreground: #f7fafc;
-  --primary: #67e8f9;
-  --primary-foreground: #062024;
-  --secondary: #102f33;
-  --secondary-foreground: #edfafa;
-  --muted: #10292d;
-  --muted-foreground: #94a3b8;
-  --accent: #15393d;
-  --accent-foreground: #ecfeff;
-  --destructive: #fb923c;
-  --border: rgba(255,255,255,0.11);
-  --input: rgba(255,255,255,0.10);
-  --ring: #67e8f9;
+  --radius: 0.6rem;
+
+  /* Platform (authenticated app) — sober light financial UI */
+  --background: #f3f0e7;
+  --foreground: #18201d;
+  --card: #faf9f5;
+  --card-foreground: #18201d;
+  --popover: #ffffff;
+  --popover-foreground: #18201d;
+  --primary: #243b36;
+  --primary-foreground: #f3f5f4;
+  --secondary: #53635d;
+  --secondary-foreground: #ffffff;
+  --muted: #e8e6dd;
+  --muted-foreground: #68726e;
+  --accent: #e7e3d9;
+  --accent-foreground: #243b36;
+  --destructive: #a94442;
+  --border: #cfd1c3;
+  --input: #cfd1c3;
+  --ring: #243b36;
+
+  --positive: #2f6b4f;
+  --positive-foreground: #f3f5f4;
+  --negative: #a94442;
+  --negative-foreground: #f3f5f4;
+  --warning: #946b2d;
+  --warning-foreground: #f3f5f4;
+  --info: #3f6680;
+  --info-foreground: #f3f5f4;
 }
 
 * { border-color: var(--border); }
 
-html { background: #061619; }
+html { background: var(--background); }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #061619;
+  background: var(--background);
   color: var(--foreground);
   font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
 }
 
 button, input, textarea, select { font: inherit; }
 
-.cinematic-shell {
-  isolation: isolate;
-  background:
-    radial-gradient(circle at 82% 12%, rgba(244, 112, 56, 0.24), transparent 30rem),
-    radial-gradient(circle at 15% 88%, rgba(34, 211, 238, 0.16), transparent 31rem),
-    radial-gradient(circle at 50% 35%, rgba(12, 79, 81, 0.4), transparent 38rem),
-    linear-gradient(125deg, #061619 0%, #09272a 48%, #171411 100%);
+/* Tabular figures for financial values — pair with Tailwind's `tabular-nums` utility
+   on individual amounts; this is a fallback for legacy call sites. */
+.font-financial { font-variant-numeric: tabular-nums; }
+
+::selection { background: rgba(36,59,54,0.18); color: var(--foreground); }
+
+@keyframes platform-page-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.cinematic-shell::before {
-  content: "";
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.28;
-  background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: linear-gradient(to bottom, black, transparent 86%);
+.platform-page-enter {
+  animation: platform-page-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .cinematic-shell::after {
-    content: "";
-    position: fixed;
-    z-index: -1;
-    right: 10%;
-    top: 15%;
-    height: 12rem;
-    width: 12rem;
-    border: 1px solid rgba(103,232,249,0.14);
-    transform: rotate(28deg);
-    box-shadow: 0 0 65px rgba(103,232,249,0.08);
+@keyframes login-page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes login-page-leave {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes login-panel-enter {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes login-panel-leave {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
+}
+
+.login-page-enter { animation: login-page-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.login-page-leave { animation: login-page-leave 650ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.login-panel-enter { animation: login-panel-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.login-panel-leave { animation: login-panel-leave 650ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+::view-transition-group(root),
+::view-transition-group(rural-media),
+::view-transition-group(sigar-wordmark),
+::view-transition-group(login-panel) {
+  animation-duration: 700ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(root) { animation: login-page-leave 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+::view-transition-new(root) { animation: login-page-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+::view-transition-new(login-panel) { animation: login-panel-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+::view-transition-old(login-panel) { animation: login-panel-leave 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .login-page,
+  .login-panel,
+  .platform-page-enter {
+    animation: none !important;
+  }
+
+  .login-page *,
+  .login-page *::before,
+  .login-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  ::view-transition-group(root),
+  ::view-transition-group(rural-media),
+  ::view-transition-group(sigar-wordmark),
+  ::view-transition-group(login-panel) {
+    animation-duration: 0.01ms;
   }
 }
-
-::selection { background: rgba(103,232,249,0.28); color: white; }

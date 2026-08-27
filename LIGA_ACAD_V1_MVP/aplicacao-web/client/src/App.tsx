@@ -7,6 +7,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import CashFlowPage from "./pages/CashFlowPage";
 import DashboardPage from "./pages/DashboardPage";
+import Home from "./pages/Home";
+import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import PropertiesPage from "./pages/PropertiesPage";
 
@@ -27,10 +29,12 @@ function ProfileRoute() {
 }
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
+  // "/" is the public marketing homepage; the financial platform lives under "/dashboard".
   return (
     <Switch>
-      <Route path={"/"} component={DashboardRoute} />
+      <Route path={"/"} component={Home} />
+      <Route path={"/login"} component={LoginPage} />
+      <Route path={"/dashboard"} component={DashboardRoute} />
       <Route path={"/propriedades"} component={PropertiesRoute} />
       <Route path={"/fluxo-de-caixa"} component={CashFlowRoute} />
       <Route path={"/perfil"} component={ProfileRoute} />
@@ -42,15 +46,16 @@ function Router() {
 }
 
 // NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
+// - Platform (dashboard) uses a sober light financial theme — see client/src/index.css.
+//   The public homepage layers its own dark, cinematic sections independently via
+//   explicit utility classes and does not rely on a dark ThemeProvider mode.
 // - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
-        defaultTheme="dark"
+        defaultTheme="light"
         // switchable
       >
         <TooltipProvider>

@@ -1,33 +1,36 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { AudiencesSection } from "@/components/landing/AudiencesSection";
+import { EditorialBand } from "@/components/landing/EditorialBand";
+import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
+import { FinancialPreview } from "@/components/landing/FinancialPreview";
+import { Hero } from "@/components/landing/Hero";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { LandingFooter } from "@/components/landing/LandingFooter";
+import { LandingHeader } from "@/components/landing/LandingHeader";
+import { ScrollRevealTransition } from "@/components/landing/ScrollRevealTransition";
+import { useSmoothScroll } from "@/components/landing/useSmoothScroll";
+import { WhySigarSection } from "@/components/landing/WhySigarSection";
 
 /**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
+ * Public SIGAR homepage. Fully static/illustrative — no protected tRPC calls run here.
+ * Narrative: PAISAGEM → PROPRIEDADE → DADOS → DECISÃO.
  */
 export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
-
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
+  useSmoothScroll();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen overflow-x-clip">
+      <LandingHeader />
       <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
+        <Hero />
+        <WhySigarSection />
+        <ScrollRevealTransition />
+        <EditorialBand />
+        <FinancialPreview />
+        <HowItWorks />
+        <AudiencesSection />
+        <FinalCtaSection />
       </main>
+      <LandingFooter />
     </div>
   );
 }

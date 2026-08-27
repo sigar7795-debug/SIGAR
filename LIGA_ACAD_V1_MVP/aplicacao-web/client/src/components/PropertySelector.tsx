@@ -35,20 +35,20 @@ export function PropertySelector({
       onValueChange={nextValue => onChange(Number(nextValue))}
       disabled={disabled || !properties?.length}
     >
-      <SelectTrigger className="h-11 min-w-[220px] border-white/10 bg-white/[0.055] text-left text-slate-100 shadow-none backdrop-blur-xl hover:bg-white/[0.08] focus:ring-cyan-300/50">
-        <MapPin className="mr-2 h-4 w-4 shrink-0 text-cyan-300" />
+      <SelectTrigger className="h-11 min-w-[220px] rounded-none border-olive/35 bg-transparent text-left text-graphite shadow-none hover:bg-accent focus:ring-field/50">
+        <MapPin className="mr-2 h-4 w-4 shrink-0 text-primary" />
         <SelectValue placeholder="Selecione uma propriedade" />
       </SelectTrigger>
-      <SelectContent className="border-white/10 bg-[#0b2024] text-slate-100 backdrop-blur-xl">
+      <SelectContent className="rounded-none border-olive/35 bg-card text-card-foreground">
         {properties?.map(property => (
           <SelectItem
             key={property.id}
             value={String(property.id)}
-            className="focus:bg-white/10 focus:text-white"
+            className="focus:bg-accent focus:text-accent-foreground"
           >
             <span>{property.name}</span>
             {property.municipality ? (
-              <span className="ml-2 text-xs text-slate-400">
+              <span className="ml-2 text-xs text-muted-foreground">
                 {property.municipality}{property.state ? `, ${property.state}` : ""}
               </span>
             ) : null}
