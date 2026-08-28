@@ -29,21 +29,24 @@ async function persistAuthenticatedUser(
   supabaseUser: Awaited<ReturnType<typeof signInWithSupabase>>
 ) {
   const name = getSupabaseUserName(supabaseUser);
-  await db.upsertUser({
-    openId: supabaseUser.id,
-    name,
-    email: supabaseUser.email ?? null,
-    loginMethod: "supabase-email",
-    lastSignedIn: new Date(),
-  });
-  const user = await db.getUserByOpenId(supabaseUser.id);
-  if (!user) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Não foi possível preparar a conta no SIGAR.",
+  try {
+    await db.upsertUser({
+      openId: supabaseUser.id,
+      name,
+      email: supabaseUser.email ?? null,
+      loginMethod: "supabase-email",
+      lastSignedIn: new Date(),
     });
+    const user = await db.getUserByOpenId(supabaseUser.id);
+    if (user) return user;
+  } catch {
+    // The database layer records a sanitized diagnostic code.
   }
-  return user;
+
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: "Não foi possível preparar a conta no SIGAR.",
+  });
 }
 
 async function setSessionCookie(

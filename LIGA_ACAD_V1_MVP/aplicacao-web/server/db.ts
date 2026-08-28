@@ -20,12 +20,22 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const connectionString = process.env.DATABASE_URL;
+      const isSupabaseConnection = connectionString.includes("supabase.co");
+      let normalizedConnectionString = connectionString;
+
+      if (isSupabaseConnection) {
+        const databaseUrl = new URL(connectionString);
+        databaseUrl.searchParams.delete("sslmode");
+        databaseUrl.searchParams.delete("uselibpqcompat");
+        normalizedConnectionString = databaseUrl.toString();
+      }
+
       _pool = new Pool({
-        connectionString,
+        connectionString: normalizedConnectionString,
         max: 1,
         idleTimeoutMillis: 10_000,
         connectionTimeoutMillis: 10_000,
-        ssl: connectionString.includes("supabase.co")
+        ssl: isSupabaseConnection
           ? { rejectUnauthorized: false }
           : undefined,
       });
@@ -96,7 +106,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         set: { ...updateSet, updatedAt: new Date() },
       });
   } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
+    const databaseError = error as {
+      code?: string;
+      cause?: { code?: string };
+    };
+    console.error("[Database] Failed to upsert user", {
+      code: databaseError.cause?.code ?? databaseError.code ?? "UNKNOWN",
+    });
     throw error;
   }
 }
