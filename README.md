@@ -1,7 +1,7 @@
 [README.md](https://github.com/user-attachments/files/31316210/README.md)
 # SIGAR M.V.P
 
-O **Liga Rural** é uma aplicação web de gestão financeira para propriedades rurais. Este M.V.P. centraliza propriedades, lançamentos de receitas e saídas, cálculo de fluxo de caixa, lucro bruto e lucro líquido, com uma interface escura e cinematográfica orientada à leitura objetiva dos resultados.
+O SIGAR é uma aplicação web de gestão financeira para propriedades rurais. Este M.V.P. centraliza propriedades, lançamentos de receitas e saídas, cálculo de fluxo de caixa, lucro bruto e lucro líquido, com uma interface escura e cinematográfica orientada à leitura objetiva dos resultados.
 
 ## Escopo implementado
 
