@@ -4,10 +4,10 @@ import express, {
   type Request,
   type Response,
 } from "express";
-import { registerOAuthRoutes } from "./_core/oauth";
-import { registerStorageProxy } from "./_core/storageProxy";
-import { createContext } from "./_core/context";
-import { appRouter } from "./routers";
+import { registerOAuthRoutes } from "./_core/oauth.js";
+import { registerStorageProxy } from "./_core/storageProxy.js";
+import { createContext } from "./_core/context.js";
+import { appRouter } from "./routers.js";
 
 export function createApp() {
   const app = express();

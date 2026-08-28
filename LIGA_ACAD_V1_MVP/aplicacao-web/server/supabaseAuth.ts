@@ -1,6 +1,6 @@
 import { createClient, type User as SupabaseUser } from "@supabase/supabase-js";
 import { TRPCError } from "@trpc/server";
-import { ENV } from "./_core/env";
+import { ENV } from "./_core/env.js";
 
 function createAuthClient() {
   if (!ENV.supabaseUrl || !ENV.supabaseAnonKey) {

@@ -28,6 +28,14 @@ export default function LoginPage() {
     },
     onError: error => toast.error(error.message),
   });
+  const demoLogin = trpc.auth.demoLogin.useMutation({
+    onSuccess: user => {
+      utils.auth.me.setData(undefined, user);
+      toast.success("Acesso demonstrativo iniciado.");
+      navigate("/dashboard");
+    },
+    onError: error => toast.error(error.message),
+  });
   const signUp = trpc.auth.signUp.useMutation({
     onSuccess: result => {
       if (result.requiresEmailConfirmation) {
@@ -72,7 +80,8 @@ export default function LoginPage() {
     login.mutate({ email, password, remember });
   };
 
-  const isSubmitting = login.isPending || signUp.isPending;
+  const isSubmitting =
+    login.isPending || signUp.isPending || demoLogin.isPending;
 
   const handleBack = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
@@ -284,6 +293,34 @@ export default function LoginPage() {
                 />
               </button>
             </form>
+
+            {!isSignUp ? (
+              <div className="mt-5">
+                <div className="mb-5 flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1 bg-olive/25" />
+                  <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive/70">
+                    ou
+                  </span>
+                  <span className="h-px flex-1 bg-olive/25" />
+                </div>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => demoLogin.mutate({ remember })}
+                  className="flex h-13 w-full items-center justify-between border border-field bg-transparent px-5 text-left font-semibold text-field transition-colors hover:bg-field hover:text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand disabled:cursor-wait disabled:opacity-60"
+                >
+                  <span>
+                    {demoLogin.isPending
+                      ? "Preparando demonstração..."
+                      : "Acessar demonstração"}
+                  </span>
+                  <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                </button>
+                <p className="mt-3 text-xs leading-relaxed text-graphite/55">
+                  Explore o SIGAR com dados demonstrativos, sem criar uma conta.
+                </p>
+              </div>
+            ) : null}
 
             <p className="mt-7 text-sm text-graphite/60">
               {isSignUp ? "Já possui uma conta?" : "Ainda não possui acesso?"}{" "}

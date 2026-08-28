@@ -17,8 +17,8 @@ import {
   listPropertyEntries,
   saveUserProfile,
   updateFinancialEntry,
-} from "../db";
-import { protectedProcedure, router } from "../_core/trpc";
+} from "../db.js";
+import { protectedProcedure, router } from "../_core/trpc.js";
 import {
   calculateActivitySummaries,
   calculateFinancialComparison,
@@ -29,7 +29,7 @@ import {
   getFinancialDisplayStatus,
   getPeriodWindow,
   getPreviousPeriodWindow,
-} from "../../shared/financial";
+} from "../../shared/financial.js";
 import {
   createDemoDomainUser,
   createDemoFinancialEntry,
@@ -45,7 +45,7 @@ import {
   listDemoEntries,
   saveDemoProfile,
   updateDemoFinancialEntry,
-} from "../demo";
+} from "../demo.js";
 
 const profileRoles = [
   "produtor",

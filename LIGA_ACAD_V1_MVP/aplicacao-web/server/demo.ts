@@ -4,7 +4,7 @@ import type {
   User,
   UserProfile,
   Usuario,
-} from "../drizzle/schema";
+} from "../drizzle/schema.js";
 
 export const DEMO_OPEN_ID_PREFIX = "sigar-demo:";
 

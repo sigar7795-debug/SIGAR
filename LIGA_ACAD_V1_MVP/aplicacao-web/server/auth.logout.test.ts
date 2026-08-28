@@ -146,3 +146,48 @@ describe("auth.login", () => {
     });
   });
 });
+
+describe("auth.demoLogin", () => {
+  it("starts a demo session without Supabase credentials", async () => {
+    const cookies: Array<{
+      name: string;
+      value: string;
+      options: Record<string, unknown>;
+    }> = [];
+    const ctx: TrpcContext = {
+      user: null,
+      req: {
+        protocol: "https",
+        headers: {},
+      } as TrpcContext["req"],
+      res: {
+        cookie: (
+          name: string,
+          value: string,
+          options: Record<string, unknown>
+        ) => {
+          cookies.push({ name, value, options });
+        },
+      } as TrpcContext["res"],
+    };
+    const caller = appRouter.createCaller(ctx);
+
+    const user = await caller.auth.demoLogin({ remember: false });
+
+    expect(user).toMatchObject({
+      email: "demonstracao@sigar.local",
+      loginMethod: "demonstracao",
+      role: "user",
+    });
+    expect(user.openId).toMatch(/^sigar-demo:/);
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0]?.name).toBe(COOKIE_NAME);
+    expect(cookies[0]?.options).toMatchObject({
+      secure: true,
+      sameSite: "none",
+      httpOnly: true,
+      path: "/",
+    });
+    expect(cookies[0]?.options).not.toHaveProperty("maxAge");
+  });
+});
