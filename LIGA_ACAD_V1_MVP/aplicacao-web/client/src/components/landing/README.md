@@ -1,29 +1,13 @@
 # Landing media — status
 
-`Hero` uses real footage: `client/public/media/sigar-hero.mp4` + `sigar-hero-poster.jpg`,
+`Hero` uses production-ready real footage: `sigar-hero-web.mp4` for desktop,
+`sigar-hero-mobile.mp4` for mobile and `sigar-hero-poster.jpg` as its fallback,
 sourced from the licensed clip at `rural_zones/12165164_3840_2160_24fps.mp4`. `VideoBreakSection`
 and `FinalCtaSection` are untouched and still render their `FieldScene` placeholder (a stylised
 SVG contour illustration, not a photo). See `FieldScene.tsx` and `BackgroundVideo.tsx`.
 
-Both files under `client/public/media/` are **local-dev-only and gitignored** — production is
-expected to serve them from external storage (CDN/object storage) via URLs, not from this repo.
-The 4K source in `rural_zones/` is gitignored too and must never be committed.
-
-## Known gap — video not yet optimized
-
-FFmpeg wasn't available in the environment that produced this build, so `sigar-hero.mp4` is
-currently the **raw 4K source copied as-is** (~230MB, no re-encode) rather than the spec'd
-web-optimized file (H.264, ≤1920×1080, 24fps, muted, 12–20s loop, <8MB). Likewise,
-`sigar-hero-poster.jpg` was extracted via a Windows Shell thumbnail (not ffmpeg), so it's a
-JPEG rather than the spec'd WebP. Before shipping this to production:
-
-1. Re-encode with ffmpeg per the brief: desktop MP4 H.264 ≤1920×1080 @24fps, 12–20s loop,
-   muted, faststart, <8MB. Produce a `sigar-hero-poster.webp` (<500KB) alongside it.
-2. Produce a dedicated mobile file (not just a crop of the desktop file), <4MB, and pass it
-   as `mobileSrc` on the `Hero`'s `<BackgroundVideo>` call — until then, `BackgroundVideo`
-   deliberately shows the poster on mobile viewports instead of the desktop video.
-3. Update the `src`/`posterSrc` paths in `Hero.tsx` if filenames change, and swap the
-   `.jpg` poster reference to `.webp` if you regenerate it.
+The shipped clips are muted H.264 MP4 files with fast-start metadata: desktop is 1080p and
+about 6 MB; mobile is 720p and about 2.4 MB. The raw 4K source remains local-only and ignored.
 
 `BackgroundVideo` already handles autoplay/muted/loop/playsInline, in-view play/pause,
 `prefers-reduced-motion`, `navigator.connection.saveData`, and the mobile-without-mobile-source

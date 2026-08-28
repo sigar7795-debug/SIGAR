@@ -24,7 +24,8 @@ export function Hero() {
           />
         }
         posterSrc="/media/sigar-hero-poster.jpg"
-        desktopSrc="/media/sigar-hero.mp4"
+        desktopSrc="/media/sigar-hero-web.mp4"
+        mobileSrc="/media/sigar-hero-mobile.mp4"
         videoClassName="brightness-75"
         className="absolute inset-0 z-0 [view-transition-name:rural-media]"
       >
