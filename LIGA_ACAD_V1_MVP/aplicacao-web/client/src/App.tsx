@@ -2,7 +2,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DashboardLayout from "@/components/DashboardLayout";
 import NotFound from "@/pages/NotFound";
+import { useIsFetching } from "@tanstack/react-query";
 import { Route, Switch } from "wouter";
+import { EntryLoadingScreen } from "./components/entry-loading/EntryLoadingScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import CashFlowPage from "./pages/CashFlowPage";
@@ -52,6 +54,11 @@ function Router() {
 // - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
+  const initialQueriesInFlight = useIsFetching();
+  const forceLoadingPreview =
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get("loading-preview") === "1";
+
   return (
     <ErrorBoundary>
       <ThemeProvider
@@ -61,6 +68,10 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <EntryLoadingScreen
+            loading={initialQueriesInFlight > 0}
+            forcePreview={forceLoadingPreview}
+          />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
