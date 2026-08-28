@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/EmptyState";
-import { CashFlowChart } from "@/components/CashFlowChart";
+import { FinancialTrendChart } from "@/components/FinancialTrendChart";
 import { LoadingState, QueryErrorState } from "@/components/DataFeedback";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -218,7 +218,13 @@ export default function CashFlowPage() {
             <MetricCard label="Resultado do período" value={formatCurrency(summary?.netProfit)} description="Entradas menos todas as saídas." icon={ReceiptText} accent="cyan" />
           </section>
 
-          <section className="min-w-0 border border-olive/30 bg-card p-5 sm:p-7"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-olive/25 pb-5"><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-olive">Comparativo financeiro</p><h2 className="mt-2 font-display text-2xl font-bold text-graphite">Entradas e saídas</h2></div><p className="text-xs text-graphite/50">{period ? formatPeriod(period.startDate, period.endDate) : "Período atual"}</p></div><div className="pt-5"><CashFlowChart entries={entriesQuery.data?.entries} variant="bar" height={330} /></div></section>
+          <FinancialTrendChart
+            propertyId={propertyId}
+            properties={propertiesQuery.data}
+            onPropertyChange={setPropertyId}
+            eyebrow="Comparativo financeiro"
+            title="Entradas e saídas"
+          />
 
           <section className="overflow-hidden border border-olive/30 bg-card">
             <div className="flex flex-col gap-4 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">

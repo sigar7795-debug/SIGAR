@@ -90,7 +90,18 @@ const dateRangeInput = z.object({
   propertyId: z.number().int().positive(),
   range: z.enum(periodRanges),
   referenceDate: isoDate,
+  // Optional explicit window, additive to the range/referenceDate pair above — when both
+  // are present they take precedence over getPeriodWindow(range, referenceDate). Lets
+  // callers (e.g. a chart's rolling-window/custom-period filters) request any date span
+  // without changing what range/referenceDate alone have always meant.
+  startDate: isoDate.optional(),
+  endDate: isoDate.optional(),
 }).merge(entryFiltersInput);
+
+function resolvePeriod(input: z.infer<typeof dateRangeInput>) {
+  if (input.startDate && input.endDate) return { startDate: input.startDate, endDate: input.endDate };
+  return getPeriodWindow(input.range, input.referenceDate);
+}
 
 const entryDetailsInput = z.object({
   entryType: z.enum(financialEntryTypes),
@@ -314,7 +325,7 @@ export const financeRouter = router({
   }),
   entries: router({
     list: protectedProcedure.input(dateRangeInput).query(async ({ ctx, input }) => {
-      const period = getPeriodWindow(input.range, input.referenceDate);
+      const period = resolvePeriod(input);
       const entries = isDemoOpenId(ctx.user.openId)
         ? listDemoEntries(input.propertyId, period.startDate, period.endDate)
         : await (async () => {
@@ -364,7 +375,7 @@ export const financeRouter = router({
   }),
   dashboard: router({
     summary: protectedProcedure.input(dateRangeInput).query(async ({ ctx, input }) => {
-      const period = getPeriodWindow(input.range, input.referenceDate);
+      const period = resolvePeriod(input);
       const previousPeriod = getPreviousPeriodWindow(input.range, input.referenceDate);
       const [entries, previousEntries] = isDemoOpenId(ctx.user.openId)
         ? [

@@ -1,5 +1,5 @@
-import { CashFlowChart } from "@/components/CashFlowChart";
 import { EmptyState } from "@/components/EmptyState";
+import { FinancialTrendChart } from "@/components/FinancialTrendChart";
 import { LoadingState, QueryErrorState } from "@/components/DataFeedback";
 import { PageHeader } from "@/components/PageHeader";
 import { PropertySelector } from "@/components/PropertySelector";
@@ -153,19 +153,13 @@ export default function DashboardPage() {
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.7fr)]">
-            <article className="min-w-0 border border-olive/30 bg-card p-5 sm:p-7">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-olive/25 pb-5">
-                <div>
-                  <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-olive">Fluxo de caixa</p>
-                  <h2 className="mt-2 font-display text-2xl font-bold text-graphite">Entradas e saídas do período</h2>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-graphite/55">
-                  <span className="flex items-center gap-2"><span className="h-2 w-2 bg-field" /> Entradas</span>
-                  <span className="flex items-center gap-2"><span className="h-2 w-2 bg-[#8a7654]" /> Saídas</span>
-                </div>
-              </div>
-              <div className="pt-5"><CashFlowChart entries={entriesQuery.data?.entries} /></div>
-            </article>
+            <FinancialTrendChart
+              propertyId={propertyId}
+              properties={propertiesQuery.data}
+              onPropertyChange={setPropertyId}
+              eyebrow="Fluxo de caixa"
+              title="Entradas e saídas do período"
+            />
 
             <aside className="border border-olive/30 bg-field p-5 text-sand sm:p-7">
               <div className="border-b border-sand/20 pb-5">
