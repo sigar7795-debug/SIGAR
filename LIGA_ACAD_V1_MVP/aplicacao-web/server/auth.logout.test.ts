@@ -1,7 +1,36 @@
-import { describe, expect, it } from "vitest";
-import { appRouter } from "./routers";
+import { describe, expect, it, vi } from "vitest";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+
+const authProvider = vi.hoisted(() => ({
+  getSupabaseUserName: vi.fn(() => "Teste Sigar"),
+  signInWithSupabase: vi.fn(async () => ({
+    id: "supabase-user-id",
+    email: "teste.sigar@example.com",
+    user_metadata: { full_name: "Teste Sigar" },
+  })),
+  signUpWithSupabase: vi.fn(),
+}));
+
+const database = vi.hoisted(() => ({
+  upsertUser: vi.fn(),
+  getUserByOpenId: vi.fn(async () => ({
+    id: 7,
+    openId: "supabase-user-id",
+    email: "teste.sigar@example.com",
+    name: "Teste Sigar",
+    loginMethod: "supabase-email",
+    role: "user" as const,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+  })),
+}));
+
+vi.mock("./supabaseAuth", () => authProvider);
+vi.mock("./db", () => database);
+
+import { appRouter } from "./routers";
 
 type CookieCall = {
   name: string;
@@ -10,7 +39,10 @@ type CookieCall = {
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] } {
+function createAuthContext(): {
+  ctx: TrpcContext;
+  clearedCookies: CookieCall[];
+} {
   const clearedCookies: CookieCall[] = [];
 
   const user: AuthenticatedUser = {
@@ -61,9 +93,13 @@ describe("auth.logout", () => {
   });
 });
 
-describe("auth.demoLogin", () => {
-  it("creates a local illustrative session with a browser-compatible cookie", async () => {
-    const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+describe("auth.login", () => {
+  it("creates a Supabase-backed session with a browser-compatible cookie", async () => {
+    const cookies: Array<{
+      name: string;
+      value: string;
+      options: Record<string, unknown>;
+    }> = [];
     const ctx: TrpcContext = {
       user: null,
       req: {
@@ -71,24 +107,33 @@ describe("auth.demoLogin", () => {
         headers: {},
       } as TrpcContext["req"],
       res: {
-        cookie: (name: string, value: string, options: Record<string, unknown>) => {
+        cookie: (
+          name: string,
+          value: string,
+          options: Record<string, unknown>
+        ) => {
           cookies.push({ name, value, options });
         },
       } as TrpcContext["res"],
     };
     const caller = appRouter.createCaller(ctx);
 
-    const user = await caller.auth.demoLogin({
+    const user = await caller.auth.login({
       email: "teste.sigar@example.com",
+      password: "senha-segura",
       remember: true,
     });
 
     expect(user).toMatchObject({
       email: "teste.sigar@example.com",
       name: "Teste Sigar",
-      loginMethod: "demonstracao",
+      loginMethod: "supabase-email",
       role: "user",
     });
+    expect(authProvider.signInWithSupabase).toHaveBeenCalledWith(
+      "teste.sigar@example.com",
+      "senha-segura"
+    );
     expect(cookies).toHaveLength(1);
     expect(cookies[0]?.name).toBe(COOKIE_NAME);
     expect(cookies[0]?.value).toEqual(expect.any(String));

@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import {
   financialEntries,
   InsertUser,
@@ -12,12 +13,23 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const connectionString = process.env.DATABASE_URL;
+      _pool = new Pool({
+        connectionString,
+        max: 1,
+        idleTimeoutMillis: 10_000,
+        connectionTimeoutMillis: 10_000,
+        ssl: connectionString.includes("supabase.co")
+          ? { rejectUnauthorized: false }
+          : undefined,
+      });
+      _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -64,8 +76,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -76,9 +88,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({
+        target: users.openId,
+        set: { ...updateSet, updatedAt: new Date() },
+      });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -92,7 +108,11 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
@@ -121,7 +141,10 @@ export async function saveUserProfile(
   await db
     .insert(userProfiles)
     .values({ userId, profileRole })
-    .onDuplicateKeyUpdate({ set: { profileRole, updatedAt: new Date() } });
+    .onConflictDoUpdate({
+      target: userProfiles.userId,
+      set: { profileRole, updatedAt: new Date() },
+    });
   return getUserProfile(userId);
 }
 
@@ -170,9 +193,16 @@ async function assertDomainUsersInTransaction(
   const selectedUsers = await tx
     .select({ cpf: usuarios.cpf })
     .from(usuarios)
-    .where(and(inArray(usuarios.cpf, userCpfs), eq(usuarios.createdById, createdById)));
+    .where(
+      and(
+        inArray(usuarios.cpf, userCpfs),
+        eq(usuarios.createdById, createdById)
+      )
+    );
   if (selectedUsers.length !== userCpfs.length) {
-    throw new Error("Um ou mais utilizadores selecionados não estão disponíveis para esta conta.");
+    throw new Error(
+      "Um ou mais utilizadores selecionados não estão disponíveis para esta conta."
+    );
   }
 }
 
@@ -181,7 +211,12 @@ export async function listPropertiesByOwner(ownerId: number) {
   return db
     .select()
     .from(ruralProperties)
-    .where(and(eq(ruralProperties.ownerId, ownerId), eq(ruralProperties.isActive, true)))
+    .where(
+      and(
+        eq(ruralProperties.ownerId, ownerId),
+        eq(ruralProperties.isActive, true)
+      )
+    )
     .orderBy(desc(ruralProperties.createdAt));
 }
 
@@ -206,34 +241,51 @@ export async function getActivePropertyById(propertyId: number) {
   const result = await db
     .select()
     .from(ruralProperties)
-    .where(and(eq(ruralProperties.id, propertyId), eq(ruralProperties.isActive, true)))
+    .where(
+      and(
+        eq(ruralProperties.id, propertyId),
+        eq(ruralProperties.isActive, true)
+      )
+    )
     .limit(1);
   return result[0] ?? null;
 }
 
 export async function createProperty(
   ownerId: number,
-  values: Omit<typeof ruralProperties.$inferInsert, "id" | "ownerId" | "createdAt" | "updatedAt">
+  values: Omit<
+    typeof ruralProperties.$inferInsert,
+    "id" | "ownerId" | "createdAt" | "updatedAt"
+  >
 ) {
   const db = await requireDb();
-  const result = await db.insert(ruralProperties).values({ ownerId, ...values });
-  const createdId = Number(result[0].insertId);
+  const [created] = await db
+    .insert(ruralProperties)
+    .values({ ownerId, ...values })
+    .returning({ id: ruralProperties.id });
+  const createdId = created.id;
   return getOwnedProperty(createdId, ownerId);
 }
 
 export async function createPropertyWithUsers(
   ownerId: number,
-  values: Omit<typeof ruralProperties.$inferInsert, "id" | "ownerId" | "createdAt" | "updatedAt">,
+  values: Omit<
+    typeof ruralProperties.$inferInsert,
+    "id" | "ownerId" | "createdAt" | "updatedAt"
+  >,
   userCpfs: string[]
 ) {
   const db = await requireDb();
   return db.transaction(async tx => {
     await assertDomainUsersInTransaction(tx, userCpfs, ownerId);
-    const result = await tx.insert(ruralProperties).values({ ownerId, ...values });
-    const propertyId = Number(result[0].insertId);
-    await tx.insert(usuarioPropriedade).values(
-      userCpfs.map(userCpf => ({ userCpf, propertyId }))
-    );
+    const [created] = await tx
+      .insert(ruralProperties)
+      .values({ ownerId, ...values })
+      .returning({ id: ruralProperties.id });
+    const propertyId = created.id;
+    await tx
+      .insert(usuarioPropriedade)
+      .values(userCpfs.map(userCpf => ({ userCpf, propertyId })));
     const property = await tx
       .select()
       .from(ruralProperties)
@@ -243,7 +295,11 @@ export async function createPropertyWithUsers(
   });
 }
 
-export async function addUsersToProperty(propertyId: number, ownerId: number, userCpfs: string[]) {
+export async function addUsersToProperty(
+  propertyId: number,
+  ownerId: number,
+  userCpfs: string[]
+) {
   const db = await requireDb();
   await db.transaction(async tx => {
     await assertDomainUsersInTransaction(tx, userCpfs, ownerId);
@@ -251,9 +307,19 @@ export async function addUsersToProperty(propertyId: number, ownerId: number, us
       const existing = await tx
         .select({ userCpf: usuarioPropriedade.userCpf })
         .from(usuarioPropriedade)
-        .where(and(eq(usuarioPropriedade.userCpf, userCpf), eq(usuarioPropriedade.propertyId, propertyId)))
+        .where(
+          and(
+            eq(usuarioPropriedade.userCpf, userCpf),
+            eq(usuarioPropriedade.propertyId, propertyId)
+          )
+        )
         .limit(1);
-      if (!existing.length) await tx.insert(usuarioPropriedade).values({ userCpf, propertyId });
+      if (!existing.length) {
+        await tx
+          .insert(usuarioPropriedade)
+          .values({ userCpf, propertyId })
+          .onConflictDoNothing();
+      }
     }
   });
   return listPropertyDomainUsers(propertyId);
@@ -280,7 +346,10 @@ export async function deactivatePropertyWithDb(
 
 export async function deactivateProperty(propertyId: number) {
   const db = await requireDb();
-  await deactivatePropertyWithDb(db as unknown as PropertyDeactivationDatabase, propertyId);
+  await deactivatePropertyWithDb(
+    db as unknown as PropertyDeactivationDatabase,
+    propertyId
+  );
   return getActivePropertyById(propertyId);
 }
 
@@ -306,11 +375,17 @@ export async function listPropertyEntries(
 }
 
 export async function createFinancialEntry(
-  values: Omit<typeof financialEntries.$inferInsert, "id" | "createdAt" | "updatedAt">
+  values: Omit<
+    typeof financialEntries.$inferInsert,
+    "id" | "createdAt" | "updatedAt"
+  >
 ) {
   const db = await requireDb();
-  const result = await db.insert(financialEntries).values(values);
-  const createdId = Number(result[0].insertId);
+  const [createdIdResult] = await db
+    .insert(financialEntries)
+    .values(values)
+    .returning({ id: financialEntries.id });
+  const createdId = createdIdResult.id;
   const created = await db
     .select()
     .from(financialEntries)
@@ -324,14 +399,24 @@ export async function getPropertyEntry(entryId: number, propertyId: number) {
   const result = await db
     .select()
     .from(financialEntries)
-    .where(and(eq(financialEntries.id, entryId), eq(financialEntries.propertyId, propertyId)))
+    .where(
+      and(
+        eq(financialEntries.id, entryId),
+        eq(financialEntries.propertyId, propertyId)
+      )
+    )
     .limit(1);
   return result[0] ?? null;
 }
 
 export async function updateFinancialEntry(
   entryId: number,
-  values: Partial<Omit<typeof financialEntries.$inferInsert, "id" | "propertyId" | "createdById" | "createdAt" | "updatedAt">>
+  values: Partial<
+    Omit<
+      typeof financialEntries.$inferInsert,
+      "id" | "propertyId" | "createdById" | "createdAt" | "updatedAt"
+    >
+  >
 ) {
   const db = await requireDb();
   await db
@@ -339,7 +424,11 @@ export async function updateFinancialEntry(
     .set({ ...values, updatedAt: new Date() })
     .where(eq(financialEntries.id, entryId));
 
-  const result = await db.select().from(financialEntries).where(eq(financialEntries.id, entryId)).limit(1);
+  const result = await db
+    .select()
+    .from(financialEntries)
+    .where(eq(financialEntries.id, entryId))
+    .limit(1);
   return result[0] ?? null;
 }
 

@@ -1,6 +1,9 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { BackgroundVideo } from "@/components/landing/BackgroundVideo";
-import { supportsRouteViewTransitions, useViewTransitionNavigate } from "@/hooks/useViewTransitionNavigate";
+import {
+  supportsRouteViewTransitions,
+  useViewTransitionNavigate,
+} from "@/hooks/useViewTransitionNavigate";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -13,14 +16,30 @@ export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const exitTimerRef = useRef<number | null>(null);
   const utils = trpc.useUtils();
-  const demoLogin = trpc.auth.demoLogin.useMutation({
+  const login = trpc.auth.login.useMutation({
     onSuccess: user => {
       utils.auth.me.setData(undefined, user);
-      toast.success("Acesso demonstrativo iniciado.");
+      toast.success("Acesso realizado com segurança.");
       navigate("/dashboard");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const signUp = trpc.auth.signUp.useMutation({
+    onSuccess: result => {
+      if (result.requiresEmailConfirmation) {
+        toast.success("Conta criada. Confirme o e-mail para entrar no SIGAR.");
+        setIsSignUp(false);
+        return;
+      }
+      if (result.authenticated) {
+        utils.auth.me.setData(undefined, result.user);
+        toast.success("Conta criada com sucesso.");
+        navigate("/dashboard");
+      }
     },
     onError: error => toast.error(error.message),
   });
@@ -31,31 +50,45 @@ export default function LoginPage() {
 
   useEffect(() => {
     return () => {
-      if (exitTimerRef.current !== null) window.clearTimeout(exitTimerRef.current);
+      if (exitTimerRef.current !== null)
+        window.clearTimeout(exitTimerRef.current);
     };
   }, []);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
-    if (!email || !password) {
-      toast.error("Preencha o e-mail e a senha para continuar.");
+    if (!email || !password || (isSignUp && !name)) {
+      toast.error("Preencha os dados obrigatórios para continuar.");
       return;
     }
-    demoLogin.mutate({ email, remember });
+    if (isSignUp) {
+      signUp.mutate({ name, email, password, remember });
+      return;
+    }
+    login.mutate({ email, password, remember });
   };
+
+  const isSubmitting = login.isPending || signUp.isPending;
 
   const handleBack = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    if (supportsRouteViewTransitions() || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      supportsRouteViewTransitions() ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       navigate("/");
       return;
     }
 
     setIsLeaving(true);
-    exitTimerRef.current = window.setTimeout(() => navigate("/"), FALLBACK_EXIT_MS);
+    exitTimerRef.current = window.setTimeout(
+      () => navigate("/"),
+      FALLBACK_EXIT_MS
+    );
   };
 
   return (
@@ -115,21 +148,48 @@ export default function LoginPage() {
             </p>
             <p className="inline-flex items-center gap-2 whitespace-nowrap font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-field">
               <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" />
-              Modo demonstrativo
+              Autenticação segura
             </p>
           </div>
 
           <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12 sm:py-14 md:py-10">
             <header>
-              <h2 className="font-display text-5xl font-bold leading-none text-graphite sm:text-6xl">Entre no SIGAR.</h2>
+              <h2 className="font-display text-5xl font-bold leading-none text-graphite sm:text-6xl">
+                {isSignUp ? "Crie sua conta." : "Entre no SIGAR."}
+              </h2>
               <p className="mt-4 max-w-sm text-sm leading-relaxed text-graphite/65 sm:text-base">
-                Acesse os dados e a gestão da sua propriedade.
+                {isSignUp
+                  ? "Comece a organizar os dados da sua propriedade."
+                  : "Acesse os dados e a gestão da sua propriedade."}
               </p>
             </header>
 
             <form className="mt-10 space-y-7" onSubmit={handleSubmit}>
+              {isSignUp ? (
+                <label className="block" htmlFor="login-name">
+                  <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
+                    Nome completo
+                  </span>
+                  <span className="relative mt-2 block">
+                    <input
+                      id="login-name"
+                      name="name"
+                      type="text"
+                      required
+                      autoComplete="name"
+                      className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
+                    />
+                  </span>
+                </label>
+              ) : null}
               <label className="block" htmlFor="login-email">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">E-mail</span>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
+                  E-mail
+                </span>
                 <span className="relative mt-2 block">
                   <input
                     id="login-email"
@@ -139,30 +199,45 @@ export default function LoginPage() {
                     autoComplete="email"
                     className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
                   />
-                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100" />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
+                  />
                 </span>
               </label>
 
               <label className="block" htmlFor="login-password">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">Senha</span>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
+                  Senha
+                </span>
                 <span className="relative mt-2 block">
                   <input
                     id="login-password"
                     name="password"
                     type={showPassword ? "text" : "password"}
                     required
+                    minLength={8}
                     autoComplete="current-password"
                     className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 pr-11 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
                   />
-                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100" />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
+                  />
                   <button
                     type="button"
                     onClick={() => setShowPassword(current => !current)}
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    aria-label={
+                      showPassword ? "Ocultar senha" : "Mostrar senha"
+                    }
                     title={showPassword ? "Ocultar senha" : "Mostrar senha"}
                     className="absolute bottom-2 right-0 grid h-8 w-8 place-items-center text-olive transition-colors hover:text-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
                   >
-                    {showPassword ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff aria-hidden="true" className="h-4 w-4" />
+                    ) : (
+                      <Eye aria-hidden="true" className="h-4 w-4" />
+                    )}
                   </button>
                 </span>
               </label>
@@ -179,7 +254,11 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => toast.info("A recuperação de senha será conectada na etapa de autenticação.")}
+                  onClick={() =>
+                    toast.info(
+                      "Solicite a redefinição de senha ao administrador do SIGAR."
+                    )
+                  }
                   className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
                 >
                   Esqueci minha senha
@@ -188,25 +267,32 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={demoLogin.isPending}
+                disabled={isSubmitting}
                 className="group relative flex h-13 w-full items-center justify-between overflow-hidden border border-field bg-field px-5 text-left font-semibold text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand"
               >
                 <span className="absolute inset-0 origin-left scale-x-0 bg-paper transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100" />
                 <span className="relative z-10 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field">
-                  {demoLogin.isPending ? "Entrando..." : "Entrar"}
+                  {isSubmitting
+                    ? "Aguarde..."
+                    : isSignUp
+                      ? "Criar conta"
+                      : "Entrar"}
                 </span>
-                <ArrowRight aria-hidden="true" className="relative z-10 h-4 w-4 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field" />
+                <ArrowRight
+                  aria-hidden="true"
+                  className="relative z-10 h-4 w-4 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field"
+                />
               </button>
             </form>
 
             <p className="mt-7 text-sm text-graphite/60">
-              Ainda não possui acesso?{" "}
+              {isSignUp ? "Já possui uma conta?" : "Ainda não possui acesso?"}{" "}
               <button
                 type="button"
-                onClick={() => toast.success("Solicitação demonstrativa registrada.")}
+                onClick={() => setIsSignUp(current => !current)}
                 className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
               >
-                Solicitar acesso
+                {isSignUp ? "Entrar" : "Criar conta"}
               </button>
             </p>
           </div>

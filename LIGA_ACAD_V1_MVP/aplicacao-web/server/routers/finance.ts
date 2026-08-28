@@ -47,7 +47,13 @@ import {
   updateDemoFinancialEntry,
 } from "../demo";
 
-const profileRoles = ["produtor", "gestor", "estudante", "consultor", "administrador"] as const;
+const profileRoles = [
+  "produtor",
+  "gestor",
+  "estudante",
+  "consultor",
+  "administrador",
+] as const;
 const periodRanges = ["dia", "mes", "trimestre", "ano"] as const;
 const propertyRemovalRoles = ["gestor", "administrador"] as const;
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -60,15 +66,35 @@ export function isValidCpf(value: string) {
   const cpf = normalizeCpf(value);
   if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
   const calculateDigit = (length: number) => {
-    const sum = cpf.slice(0, length).split("").reduce((total, digit, index) => total + Number(digit) * (length + 1 - index), 0);
+    const sum = cpf
+      .slice(0, length)
+      .split("")
+      .reduce(
+        (total, digit, index) => total + Number(digit) * (length + 1 - index),
+        0
+      );
     const remainder = (sum * 10) % 11;
     return remainder === 10 ? 0 : remainder;
   };
-  return calculateDigit(9) === Number(cpf[9]) && calculateDigit(10) === Number(cpf[10]);
+  return (
+    calculateDigit(9) === Number(cpf[9]) &&
+    calculateDigit(10) === Number(cpf[10])
+  );
 }
 
-const cpfInput = z.string().trim().min(11).max(18).transform(normalizeCpf).refine(isValidCpf, "CPF inválido.");
-const domainUserSexes = ["feminino", "masculino", "outro", "nao_informar"] as const;
+const cpfInput = z
+  .string()
+  .trim()
+  .min(11)
+  .max(18)
+  .transform(normalizeCpf)
+  .refine(isValidCpf, "CPF inválido.");
+const domainUserSexes = [
+  "feminino",
+  "masculino",
+  "outro",
+  "nao_informar",
+] as const;
 
 const propertyInput = z.object({
   name: z.string().trim().min(3).max(140),
@@ -77,7 +103,11 @@ const propertyInput = z.object({
   totalArea: z.coerce.number().positive().max(99999999).optional(),
   mainActivity: z.string().trim().max(120).optional(),
   description: z.string().trim().max(1200).optional(),
-  userCpfs: z.array(cpfInput).min(1, "Selecione pelo menos um proprietário.").max(25).transform(values => Array.from(new Set(values))),
+  userCpfs: z
+    .array(cpfInput)
+    .min(1, "Selecione pelo menos um proprietário.")
+    .max(25)
+    .transform(values => Array.from(new Set(values))),
 });
 
 const entryFiltersInput = z.object({
@@ -86,20 +116,23 @@ const entryFiltersInput = z.object({
   settlementStatus: z.enum(financialDisplayStatuses).optional(),
 });
 
-const dateRangeInput = z.object({
-  propertyId: z.number().int().positive(),
-  range: z.enum(periodRanges),
-  referenceDate: isoDate,
-  // Optional explicit window, additive to the range/referenceDate pair above — when both
-  // are present they take precedence over getPeriodWindow(range, referenceDate). Lets
-  // callers (e.g. a chart's rolling-window/custom-period filters) request any date span
-  // without changing what range/referenceDate alone have always meant.
-  startDate: isoDate.optional(),
-  endDate: isoDate.optional(),
-}).merge(entryFiltersInput);
+const dateRangeInput = z
+  .object({
+    propertyId: z.number().int().positive(),
+    range: z.enum(periodRanges),
+    referenceDate: isoDate,
+    // Optional explicit window, additive to the range/referenceDate pair above — when both
+    // are present they take precedence over getPeriodWindow(range, referenceDate). Lets
+    // callers (e.g. a chart's rolling-window/custom-period filters) request any date span
+    // without changing what range/referenceDate alone have always meant.
+    startDate: isoDate.optional(),
+    endDate: isoDate.optional(),
+  })
+  .merge(entryFiltersInput);
 
 function resolvePeriod(input: z.infer<typeof dateRangeInput>) {
-  if (input.startDate && input.endDate) return { startDate: input.startDate, endDate: input.endDate };
+  if (input.startDate && input.endDate)
+    return { startDate: input.startDate, endDate: input.endDate };
   return getPeriodWindow(input.range, input.referenceDate);
 }
 
@@ -114,13 +147,17 @@ const entryDetailsInput = z.object({
   amount: z.coerce.number().positive().max(999999999),
 });
 
-const entryCreateInput = entryDetailsInput.extend({ propertyId: z.number().int().positive() });
+const entryCreateInput = entryDetailsInput.extend({
+  propertyId: z.number().int().positive(),
+});
 const entryUpdateInput = entryDetailsInput.extend({
   propertyId: z.number().int().positive(),
   entryId: z.number().int().positive(),
 });
 
-export function ensurePropertyOwnership<T extends { id: number }>(property: T | null) {
+export function ensurePropertyOwnership<T extends { id: number }>(
+  property: T | null
+) {
   if (!property) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -134,8 +171,11 @@ export function canDeactivateProperty(
   profileRole: string | null | undefined,
   accountRole: "user" | "admin"
 ) {
-  return accountRole === "admin" || propertyRemovalRoles.includes(
-    profileRole as (typeof propertyRemovalRoles)[number]
+  return (
+    accountRole === "admin" ||
+    propertyRemovalRoles.includes(
+      profileRole as (typeof propertyRemovalRoles)[number]
+    )
   );
 }
 
@@ -144,7 +184,11 @@ async function assertPropertyOwnership(propertyId: number, ownerId: number) {
   return ensurePropertyOwnership(property);
 }
 
-async function assertEntryOwnership(entryId: number, propertyId: number, ownerId: number) {
+async function assertEntryOwnership(
+  entryId: number,
+  propertyId: number,
+  ownerId: number
+) {
   await assertPropertyOwnership(propertyId, ownerId);
   return ensurePropertyOwnership(await getPropertyEntry(entryId, propertyId));
 }
@@ -176,14 +220,21 @@ function applyEntryFilters<
     entryType: (typeof financialEntryTypes)[number];
     settlementStatus: (typeof financialSettlementStatuses)[number];
     dueOn: Date | null;
-  }
+  },
 >(entries: T[], filters: z.infer<typeof entryFiltersInput>) {
   return entries
-    .map(entry => ({ ...entry, displayStatus: getFinancialDisplayStatus(entry) }))
+    .map(entry => ({
+      ...entry,
+      displayStatus: getFinancialDisplayStatus(entry),
+    }))
     .filter(entry => {
       if (filters.activity && entry.activity !== filters.activity) return false;
       if (filters.category && entry.category !== filters.category) return false;
-      if (filters.settlementStatus && entry.displayStatus !== filters.settlementStatus) return false;
+      if (
+        filters.settlementStatus &&
+        entry.displayStatus !== filters.settlementStatus
+      )
+        return false;
       return true;
     });
 }
@@ -223,11 +274,13 @@ export const financeRouter = router({
         : listDomainUsersByCreator(ctx.user.id)
     ),
     create: protectedProcedure
-      .input(z.object({
-        cpf: cpfInput,
-        name: z.string().trim().min(3).max(160),
-        sex: z.enum(domainUserSexes).default("nao_informar"),
-      }))
+      .input(
+        z.object({
+          cpf: cpfInput,
+          name: z.string().trim().min(3).max(160),
+          sex: z.enum(domainUserSexes).default("nao_informar"),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         if (isDemoOpenId(ctx.user.openId)) {
           return createDemoDomainUser(input);
@@ -240,8 +293,11 @@ export const financeRouter = router({
             createdById: ctx.user.id,
           });
         } catch (error: any) {
-          if (error?.code === "ER_DUP_ENTRY") {
-            throw new TRPCError({ code: "CONFLICT", message: "Já existe um utilizador com este CPF nesta conta." });
+          if (error?.code === "23505" || error?.code === "ER_DUP_ENTRY") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Já existe um utilizador com este CPF nesta conta.",
+            });
           }
           throw error;
         }
@@ -258,56 +314,84 @@ export const financeRouter = router({
           }));
       }
       const properties = await listPropertiesByOwner(ctx.user.id);
-      return Promise.all(properties.map(async property => ({
-        ...property,
-        domainUsers: await listPropertyDomainUsers(property.id),
-      })));
+      return Promise.all(
+        properties.map(async property => ({
+          ...property,
+          domainUsers: await listPropertyDomainUsers(property.id),
+        }))
+      );
     }),
-    create: protectedProcedure.input(propertyInput).mutation(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return createDemoProperty(input);
-      }
-      try {
-        return await createPropertyWithUsers(ctx.user.id, {
-          name: input.name,
-          municipality: input.municipality || null,
-          state: input.state || null,
-          totalArea: input.totalArea ? input.totalArea.toFixed(2) : null,
-          mainActivity: input.mainActivity || null,
-          description: input.description || null,
-          isActive: true,
-        }, input.userCpfs);
-      } catch (error: any) {
-        if (error?.message?.includes("utilizadores selecionados")) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    create: protectedProcedure
+      .input(propertyInput)
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return createDemoProperty(input);
         }
-        throw error;
-      }
-    }),
-    users: protectedProcedure.input(z.object({ propertyId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return getDemoPropertyUsers(input.propertyId);
-      }
-      await assertPropertyOwnership(input.propertyId, ctx.user.id);
-      return listPropertyDomainUsers(input.propertyId);
-    }),
-    linkUsers: protectedProcedure.input(z.object({
-      propertyId: z.number().int().positive(),
-      userCpfs: z.array(cpfInput).min(1).max(25).transform(values => Array.from(new Set(values))),
-    })).mutation(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return linkDemoPropertyUsers(input.propertyId, input.userCpfs);
-      }
-      await assertPropertyOwnership(input.propertyId, ctx.user.id);
-      try {
-        return await addUsersToProperty(input.propertyId, ctx.user.id, input.userCpfs);
-      } catch (error: any) {
-        if (error?.message?.includes("utilizadores selecionados")) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        try {
+          return await createPropertyWithUsers(
+            ctx.user.id,
+            {
+              name: input.name,
+              municipality: input.municipality || null,
+              state: input.state || null,
+              totalArea: input.totalArea ? input.totalArea.toFixed(2) : null,
+              mainActivity: input.mainActivity || null,
+              description: input.description || null,
+              isActive: true,
+            },
+            input.userCpfs
+          );
+        } catch (error: any) {
+          if (error?.message?.includes("utilizadores selecionados")) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: error.message,
+            });
+          }
+          throw error;
         }
-        throw error;
-      }
-    }),
+      }),
+    users: protectedProcedure
+      .input(z.object({ propertyId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return getDemoPropertyUsers(input.propertyId);
+        }
+        await assertPropertyOwnership(input.propertyId, ctx.user.id);
+        return listPropertyDomainUsers(input.propertyId);
+      }),
+    linkUsers: protectedProcedure
+      .input(
+        z.object({
+          propertyId: z.number().int().positive(),
+          userCpfs: z
+            .array(cpfInput)
+            .min(1)
+            .max(25)
+            .transform(values => Array.from(new Set(values))),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return linkDemoPropertyUsers(input.propertyId, input.userCpfs);
+        }
+        await assertPropertyOwnership(input.propertyId, ctx.user.id);
+        try {
+          return await addUsersToProperty(
+            input.propertyId,
+            ctx.user.id,
+            input.userCpfs
+          );
+        } catch (error: any) {
+          if (error?.message?.includes("utilizadores selecionados")) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: error.message,
+            });
+          }
+          throw error;
+        }
+      }),
     deactivate: protectedProcedure
       .input(z.object({ propertyId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
@@ -324,80 +408,134 @@ export const financeRouter = router({
       }),
   }),
   entries: router({
-    list: protectedProcedure.input(dateRangeInput).query(async ({ ctx, input }) => {
-      const period = resolvePeriod(input);
-      const entries = isDemoOpenId(ctx.user.openId)
-        ? listDemoEntries(input.propertyId, period.startDate, period.endDate)
-        : await (async () => {
-            await assertPropertyOwnership(input.propertyId, ctx.user.id);
-            return listPropertyEntries(input.propertyId, period.startDate, period.endDate);
-          })();
-      const filteredEntries = applyEntryFilters(entries, input);
-      return {
-        entries: filteredEntries,
-        period,
-        activities: Array.from(new Set(entries.map(entry => entry.activity))).sort(),
-        categories: Array.from(new Set(entries.map(entry => entry.category))).sort(),
-      };
-    }),
-    create: protectedProcedure.input(entryCreateInput).mutation(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return createDemoFinancialEntry({
+    list: protectedProcedure
+      .input(dateRangeInput)
+      .query(async ({ ctx, input }) => {
+        const period = resolvePeriod(input);
+        const entries = isDemoOpenId(ctx.user.openId)
+          ? listDemoEntries(input.propertyId, period.startDate, period.endDate)
+          : await (async () => {
+              await assertPropertyOwnership(input.propertyId, ctx.user.id);
+              return listPropertyEntries(
+                input.propertyId,
+                period.startDate,
+                period.endDate
+              );
+            })();
+        const filteredEntries = applyEntryFilters(entries, input);
+        return {
+          entries: filteredEntries,
+          period,
+          activities: Array.from(
+            new Set(entries.map(entry => entry.activity))
+          ).sort(),
+          categories: Array.from(
+            new Set(entries.map(entry => entry.category))
+          ).sort(),
+        };
+      }),
+    create: protectedProcedure
+      .input(entryCreateInput)
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return createDemoFinancialEntry({
+            propertyId: input.propertyId,
+            createdById: ctx.user.id,
+            ...entryValues(input),
+          });
+        }
+        await assertPropertyOwnership(input.propertyId, ctx.user.id);
+        return createFinancialEntry({
           propertyId: input.propertyId,
           createdById: ctx.user.id,
           ...entryValues(input),
         });
-      }
-      await assertPropertyOwnership(input.propertyId, ctx.user.id);
-      return createFinancialEntry({
-        propertyId: input.propertyId,
-        createdById: ctx.user.id,
-        ...entryValues(input),
-      });
-    }),
-    update: protectedProcedure.input(entryUpdateInput).mutation(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return updateDemoFinancialEntry(input.entryId, entryValues(input));
-      }
-      await assertEntryOwnership(input.entryId, input.propertyId, ctx.user.id);
-      return updateFinancialEntry(input.entryId, entryValues(input));
-    }),
+      }),
+    update: protectedProcedure
+      .input(entryUpdateInput)
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return updateDemoFinancialEntry(input.entryId, entryValues(input));
+        }
+        await assertEntryOwnership(
+          input.entryId,
+          input.propertyId,
+          ctx.user.id
+        );
+        return updateFinancialEntry(input.entryId, entryValues(input));
+      }),
     delete: protectedProcedure
-      .input(z.object({ propertyId: z.number().int().positive(), entryId: z.number().int().positive() }))
+      .input(
+        z.object({
+          propertyId: z.number().int().positive(),
+          entryId: z.number().int().positive(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         if (isDemoOpenId(ctx.user.openId)) {
           return deleteDemoFinancialEntry(input.entryId);
         }
-        await assertEntryOwnership(input.entryId, input.propertyId, ctx.user.id);
+        await assertEntryOwnership(
+          input.entryId,
+          input.propertyId,
+          ctx.user.id
+        );
         await deleteFinancialEntry(input.entryId);
         return { id: input.entryId, deleted: true };
       }),
   }),
   dashboard: router({
-    summary: protectedProcedure.input(dateRangeInput).query(async ({ ctx, input }) => {
-      const period = resolvePeriod(input);
-      const previousPeriod = getPreviousPeriodWindow(input.range, input.referenceDate);
-      const [entries, previousEntries] = isDemoOpenId(ctx.user.openId)
-        ? [
-            listDemoEntries(input.propertyId, period.startDate, period.endDate),
-            listDemoEntries(input.propertyId, previousPeriod.startDate, previousPeriod.endDate),
-          ]
-        : await (async () => {
-            await assertPropertyOwnership(input.propertyId, ctx.user.id);
-            return Promise.all([
-              listPropertyEntries(input.propertyId, period.startDate, period.endDate),
-              listPropertyEntries(input.propertyId, previousPeriod.startDate, previousPeriod.endDate),
-            ]);
-          })();
-      const filteredEntries = applyEntryFilters(entries, input);
-      const filteredPreviousEntries = applyEntryFilters(previousEntries, input);
-      return {
-        period,
-        previousPeriod,
-        summary: calculateFinancialSummary(filteredEntries),
-        comparison: calculateFinancialComparison(filteredEntries, filteredPreviousEntries),
-        activitySummaries: calculateActivitySummaries(filteredEntries),
-      };
-    }),
+    summary: protectedProcedure
+      .input(dateRangeInput)
+      .query(async ({ ctx, input }) => {
+        const period = resolvePeriod(input);
+        const previousPeriod = getPreviousPeriodWindow(
+          input.range,
+          input.referenceDate
+        );
+        const [entries, previousEntries] = isDemoOpenId(ctx.user.openId)
+          ? [
+              listDemoEntries(
+                input.propertyId,
+                period.startDate,
+                period.endDate
+              ),
+              listDemoEntries(
+                input.propertyId,
+                previousPeriod.startDate,
+                previousPeriod.endDate
+              ),
+            ]
+          : await (async () => {
+              await assertPropertyOwnership(input.propertyId, ctx.user.id);
+              return Promise.all([
+                listPropertyEntries(
+                  input.propertyId,
+                  period.startDate,
+                  period.endDate
+                ),
+                listPropertyEntries(
+                  input.propertyId,
+                  previousPeriod.startDate,
+                  previousPeriod.endDate
+                ),
+              ]);
+            })();
+        const filteredEntries = applyEntryFilters(entries, input);
+        const filteredPreviousEntries = applyEntryFilters(
+          previousEntries,
+          input
+        );
+        return {
+          period,
+          previousPeriod,
+          summary: calculateFinancialSummary(filteredEntries),
+          comparison: calculateFinancialComparison(
+            filteredEntries,
+            filteredPreviousEntries
+          ),
+          activitySummaries: calculateActivitySummaries(filteredEntries),
+        };
+      }),
   }),
 });
