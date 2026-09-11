@@ -369,6 +369,44 @@ export async function deactivateProperty(propertyId: number) {
   return getActivePropertyById(propertyId);
 }
 
+export type PropertyUpdateValues = Omit<
+  typeof ruralProperties.$inferInsert,
+  "id" | "ownerId" | "createdAt" | "updatedAt" | "isActive"
+>;
+
+type PropertyUpdateDatabase = {
+  update: (table: typeof ruralProperties) => {
+    set: (values: PropertyUpdateValues & { updatedAt: Date }) => {
+      where: (condition: unknown) => Promise<unknown>;
+    };
+  };
+};
+
+export async function updatePropertyWithDb(
+  db: PropertyUpdateDatabase,
+  propertyId: number,
+  values: PropertyUpdateValues,
+  updatedAt = new Date()
+) {
+  await db
+    .update(ruralProperties)
+    .set({ ...values, updatedAt })
+    .where(eq(ruralProperties.id, propertyId));
+}
+
+export async function updateProperty(
+  propertyId: number,
+  values: PropertyUpdateValues
+) {
+  const db = await requireDb();
+  await updatePropertyWithDb(
+    db as unknown as PropertyUpdateDatabase,
+    propertyId,
+    values
+  );
+  return getActivePropertyById(propertyId);
+}
+
 export async function listPropertyEntries(
   propertyId: number,
   startDate: string,

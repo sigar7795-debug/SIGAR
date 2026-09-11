@@ -312,6 +312,23 @@ export function deactivateDemoProperty(propertyId: number) {
   return { id: propertyId, isActive: false as const };
 }
 
+export function updateDemoProperty(
+  propertyId: number,
+  values: {
+    name: string;
+    municipality: string | null;
+    state: string | null;
+    totalArea: string | null;
+    mainActivity: string | null;
+    description: string | null;
+  },
+) {
+  const property = demoProperties.find(item => item.id === propertyId);
+  if (!property) return null;
+  Object.assign(property, values, { updatedAt: new Date() });
+  return property;
+}
+
 export function createDemoFinancialEntry(
   values: Omit<FinancialEntry, "id" | "createdAt" | "updatedAt">,
 ) {

@@ -14,6 +14,7 @@ const database = vi.hoisted(() => ({
   listPropertyEntries: vi.fn(),
   saveUserProfile: vi.fn(),
   updateFinancialEntry: vi.fn(),
+  updateProperty: vi.fn(),
 }));
 
 vi.mock("./db", () => database);
@@ -142,6 +143,71 @@ describe("finance workflow", () => {
       code: "FORBIDDEN",
     });
     expect(database.deactivateProperty).not.toHaveBeenCalled();
+  });
+
+  it("atualiza os dados cadastrais de uma propriedade pertencente ao utilizador autenticado", async () => {
+    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    database.updateProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora Atualizada" });
+    const caller = appRouter.createCaller(createAuthenticatedContext());
+
+    await expect(
+      caller.finance.properties.update({
+        propertyId: 8,
+        name: "Fazenda Aurora Atualizada",
+        municipality: "Uberaba",
+        state: "MG",
+        totalArea: 312.5,
+        mainActivity: "Pecuária de corte",
+        description: "Nova descrição.",
+      })
+    ).resolves.toMatchObject({ id: 8, name: "Fazenda Aurora Atualizada" });
+
+    expect(database.updateProperty).toHaveBeenCalledWith(8, {
+      name: "Fazenda Aurora Atualizada",
+      municipality: "Uberaba",
+      state: "MG",
+      totalArea: "312.50",
+      mainActivity: "Pecuária de corte",
+      description: "Nova descrição.",
+    });
+  });
+
+  it("recusa a atualização de UF inválida", async () => {
+    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    const caller = appRouter.createCaller(createAuthenticatedContext());
+
+    await expect(
+      caller.finance.properties.update({
+        propertyId: 8,
+        name: "Fazenda Aurora",
+        state: "ZZ",
+      })
+    ).rejects.toBeTruthy();
+    expect(database.updateProperty).not.toHaveBeenCalled();
+  });
+
+  it("recusa a atualização de área zero ou negativa", async () => {
+    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    const caller = appRouter.createCaller(createAuthenticatedContext());
+
+    await expect(
+      caller.finance.properties.update({
+        propertyId: 8,
+        name: "Fazenda Aurora",
+        totalArea: 0,
+      })
+    ).rejects.toBeTruthy();
+    expect(database.updateProperty).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia a atualização quando a propriedade não pertence ao utilizador autenticado", async () => {
+    database.getOwnedProperty.mockResolvedValue(null);
+    const caller = appRouter.createCaller(createAuthenticatedContext());
+
+    await expect(
+      caller.finance.properties.update({ propertyId: 91, name: "Fazenda de outro titular" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(database.updateProperty).not.toHaveBeenCalled();
   });
 
   it("edita e exclui lançamento apenas quando ele pertence à propriedade do utilizador", async () => {
