@@ -26,6 +26,7 @@ import {
   saveUserProfile,
   updateFinancialEntry,
   updateMemberRole,
+  updateProperty,
 } from "../db.js";
 import { protectedProcedure, router } from "../_core/trpc.js";
 import {
@@ -57,6 +58,7 @@ import {
   revokeDemoPropertyMember,
   saveDemoProfile,
   updateDemoFinancialEntry,
+  updateDemoProperty,
   updateDemoPropertyMemberRole,
 } from "../demo.js";
 
@@ -70,6 +72,11 @@ const profileRoles = [
 const periodRanges = ["dia", "mes", "trimestre", "ano"] as const;
 const propertyRemovalRoles = ["gestor", "administrador"] as const;
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const brazilianStates = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
+  "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
+  "SP", "SE", "TO",
+] as const;
 
 export function normalizeCpf(value: string) {
   return value.replace(/\D/g, "");
@@ -116,10 +123,21 @@ const memberEmailInput = z
   .max(320)
   .email("E-mail inválido.");
 
+const stateInput = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .length(2, "UF deve ter 2 letras.")
+  .refine(
+    (value): value is (typeof brazilianStates)[number] =>
+      brazilianStates.includes(value as (typeof brazilianStates)[number]),
+    "UF inválida."
+  );
+
 const propertyInput = z.object({
   name: z.string().trim().min(3).max(140),
   municipality: z.string().trim().max(100).optional(),
-  state: z.string().trim().toUpperCase().length(2).optional(),
+  state: stateInput.optional(),
   totalArea: z.coerce.number().positive().max(99999999).optional(),
   mainActivity: z.string().trim().max(120).optional(),
   description: z.string().trim().max(1200).optional(),
@@ -128,6 +146,10 @@ const propertyInput = z.object({
     .min(1, "Selecione pelo menos um proprietário.")
     .max(25)
     .transform(values => Array.from(new Set(values))),
+});
+
+const propertyUpdateInput = propertyInput.omit({ userCpfs: true }).extend({
+  propertyId: z.number().int().positive(),
 });
 
 const entryFiltersInput = z.object({
@@ -382,6 +404,23 @@ export const financeRouter = router({
           }
           throw error;
         }
+      }),
+    update: protectedProcedure
+      .input(propertyUpdateInput)
+      .mutation(async ({ ctx, input }) => {
+        const values = {
+          name: input.name,
+          municipality: input.municipality || null,
+          state: input.state || null,
+          totalArea: input.totalArea ? input.totalArea.toFixed(2) : null,
+          mainActivity: input.mainActivity || null,
+          description: input.description || null,
+        };
+        if (isDemoOpenId(ctx.user.openId)) {
+          return updateDemoProperty(input.propertyId, values);
+        }
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
+        return updateProperty(input.propertyId, values);
       }),
     users: protectedProcedure
       .input(z.object({ propertyId: z.number().int().positive() }))

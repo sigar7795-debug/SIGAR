@@ -40,6 +40,7 @@ funcionalidade, o que evita uma propriedade ficar sem proprietário.
 |---|---|
 | Ler propriedade, lançamentos, painel, lista de membros | `visualizador` |
 | Criar, editar ou remover lançamentos financeiros | `editor` |
+| Editar dados cadastrais da propriedade (RF06) | `proprietario` |
 | Convidar, alterar papel ou revogar membros | `proprietario` |
 | Remover (inativar) a propriedade | `proprietario` + perfil gestor/administrador ([docs/remocao-segura-propriedades.md](remocao-segura-propriedades.md)) |
 

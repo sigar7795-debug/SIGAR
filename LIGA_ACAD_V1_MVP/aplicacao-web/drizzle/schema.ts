@@ -181,6 +181,7 @@ export const propertyMembers = pgTable(
     ),
     index("property_members_property_idx").on(table.propertyId),
     index("property_members_user_idx").on(table.userId),
+    index("property_members_invited_by_idx").on(table.invitedById),
   ]
 );
 
