@@ -341,3 +341,81 @@ export function deleteDemoFinancialEntry(entryId: number) {
   if (index >= 0) demoEntries.splice(index, 1);
   return { id: entryId, deleted: true as const };
 }
+
+export type DemoPropertyMemberRole = "proprietario" | "editor" | "visualizador";
+export type DemoPropertyMemberStatus = "pendente" | "ativo" | "revogado" | "recusado";
+
+export type DemoPropertyMember = {
+  id: number;
+  propertyId: number;
+  userId: number | null;
+  invitedEmail: string;
+  role: DemoPropertyMemberRole;
+  status: DemoPropertyMemberStatus;
+  name: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export const demoPropertyMembers: DemoPropertyMember[] = [];
+
+export function getDemoPropertyMembers(propertyId: number) {
+  return demoPropertyMembers
+    .filter(member => member.propertyId === propertyId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export function inviteDemoPropertyMember(
+  propertyId: number,
+  email: string,
+  role: DemoPropertyMemberRole,
+) {
+  const existing = demoPropertyMembers.find(
+    member => member.propertyId === propertyId && member.invitedEmail === email,
+  );
+  if (existing) {
+    existing.role = role;
+    existing.status = existing.status === "ativo" ? "ativo" : "pendente";
+    existing.updatedAt = new Date();
+  } else {
+    const nextId = Math.max(0, ...demoPropertyMembers.map(member => member.id)) + 1;
+    demoPropertyMembers.push({
+      id: nextId,
+      propertyId,
+      userId: null,
+      invitedEmail: email,
+      role,
+      status: "pendente",
+      name: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  return getDemoPropertyMembers(propertyId);
+}
+
+export function updateDemoPropertyMemberRole(
+  propertyId: number,
+  memberId: number,
+  role: DemoPropertyMemberRole,
+) {
+  const member = demoPropertyMembers.find(
+    item => item.id === memberId && item.propertyId === propertyId,
+  );
+  if (member) {
+    member.role = role;
+    member.updatedAt = new Date();
+  }
+  return getDemoPropertyMembers(propertyId);
+}
+
+export function revokeDemoPropertyMember(propertyId: number, memberId: number) {
+  const member = demoPropertyMembers.find(
+    item => item.id === memberId && item.propertyId === propertyId,
+  );
+  if (member) {
+    member.status = "revogado";
+    member.updatedAt = new Date();
+  }
+  return getDemoPropertyMembers(propertyId);
+}

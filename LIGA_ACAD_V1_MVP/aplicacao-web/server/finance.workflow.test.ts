@@ -7,11 +7,19 @@ const database = vi.hoisted(() => ({
   deactivateProperty: vi.fn(),
   deleteFinancialEntry: vi.fn(),
   getActivePropertyById: vi.fn(),
-  getOwnedProperty: vi.fn(),
+  getEffectiveRole: vi.fn(),
   getPropertyEntry: vi.fn(),
   getUserProfile: vi.fn(),
-  listPropertiesByOwner: vi.fn(),
+  listPropertiesForUser: vi.fn(),
   listPropertyEntries: vi.fn(),
+  roleMeets: (role: string | null, minRole: string) => {
+    const rank: Record<string, number> = {
+      visualizador: 0,
+      editor: 1,
+      proprietario: 2,
+    };
+    return role !== null && rank[role] >= rank[minRole];
+  },
   saveUserProfile: vi.fn(),
   updateFinancialEntry: vi.fn(),
 }));
@@ -46,7 +54,7 @@ describe("finance workflow", () => {
   it("executa o percurso de perfil, propriedade, lançamento e consulta mensal sem persistência real", async () => {
     database.saveUserProfile.mockResolvedValue({ userId: 42, profileRole: "gestor" });
     database.createPropertyWithUsers.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
-    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    database.getEffectiveRole.mockResolvedValue("proprietario");
     database.createFinancialEntry.mockResolvedValue({ id: 15, propertyId: 8, entryType: "receita" });
     database.listPropertyEntries.mockResolvedValue([
       { entryType: "receita", amount: "12500.00" },
@@ -96,7 +104,7 @@ describe("finance workflow", () => {
   });
 
   it("bloqueia o painel quando a propriedade solicitada não pertence ao utilizador autenticado", async () => {
-    database.getOwnedProperty.mockResolvedValue(null);
+    database.getEffectiveRole.mockResolvedValue(null);
     const caller = appRouter.createCaller(createAuthenticatedContext());
 
     await expect(
@@ -111,7 +119,8 @@ describe("finance workflow", () => {
 
   it("inativa uma propriedade de gestor sem apagar o histórico financeiro", async () => {
     database.getUserProfile.mockResolvedValue({ userId: 42, profileRole: "gestor" });
-    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    database.getEffectiveRole.mockResolvedValue("proprietario");
+    database.getActivePropertyById.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
     database.deactivateProperty.mockResolvedValue({ id: 8, isActive: false });
     const caller = appRouter.createCaller(createAuthenticatedContext());
 
@@ -135,7 +144,7 @@ describe("finance workflow", () => {
 
   it("bloqueia um gestor quando a propriedade pertence a outro titular", async () => {
     database.getUserProfile.mockResolvedValue({ userId: 42, profileRole: "gestor" });
-    database.getOwnedProperty.mockResolvedValue(null);
+    database.getEffectiveRole.mockResolvedValue(null);
     const caller = appRouter.createCaller(createAuthenticatedContext());
 
     await expect(caller.finance.properties.deactivate({ propertyId: 91 })).rejects.toMatchObject({
@@ -145,7 +154,7 @@ describe("finance workflow", () => {
   });
 
   it("edita e exclui lançamento apenas quando ele pertence à propriedade do utilizador", async () => {
-    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    database.getEffectiveRole.mockResolvedValue("proprietario");
     database.getPropertyEntry.mockResolvedValue({ id: 15, propertyId: 8, entryType: "receita" });
     database.updateFinancialEntry.mockResolvedValue({ id: 15, propertyId: 8, entryType: "custo_variavel" });
     const caller = appRouter.createCaller(createAuthenticatedContext());
@@ -177,7 +186,7 @@ describe("finance workflow", () => {
   });
 
   it("bloqueia edição e exclusão quando o lançamento não pertence à propriedade selecionada", async () => {
-    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    database.getEffectiveRole.mockResolvedValue("proprietario");
     database.getPropertyEntry.mockResolvedValue(null);
     const caller = appRouter.createCaller(createAuthenticatedContext());
 

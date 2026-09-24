@@ -19,3 +19,13 @@ O CPF será normalizado para **11 dígitos**, validado pelo algoritmo de dígito
 Uma propriedade nova exige pelo menos um utilizador de domínio selecionado. A criação registra a propriedade e o vínculo inicial na mesma operação transacional. Depois do cadastro, é possível associar outros utilizadores da mesma conta à propriedade, sem remover os vínculos já existentes. Um mesmo utilizador pode estar vinculado a várias propriedades.
 
 > Os lançamentos financeiros continuam vinculados à propriedade. Assim, múltiplos proprietários partilham a mesma visão financeira daquela propriedade sem duplicar os registros de caixa.
+
+## Isto não é controlo de acesso
+
+`usuarios`/`usuario_propriedade` é um cadastro de **titularidade**, não de
+**acesso**. Uma pessoa física aqui listada não ganha, por si só, nenhum
+direito de consultar ou alterar dados da propriedade — não há qualquer
+relação com uma conta autenticada (`users`). O acesso de uma conta
+autenticada a uma propriedade, com papéis (proprietário, editor,
+visualizador) e convite, é resolvido por `propertyMembers`, descrito em
+[docs/membros-propriedade.md](membros-propriedade.md).

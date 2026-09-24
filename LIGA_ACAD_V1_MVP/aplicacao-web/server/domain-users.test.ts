@@ -5,8 +5,16 @@ const database = vi.hoisted(() => ({
   addUsersToProperty: vi.fn(),
   createDomainUser: vi.fn(),
   createPropertyWithUsers: vi.fn(),
-  getOwnedProperty: vi.fn(),
+  getEffectiveRole: vi.fn(),
   listDomainUsersByCreator: vi.fn(),
+  roleMeets: (role: string | null, minRole: string) => {
+    const rank: Record<string, number> = {
+      visualizador: 0,
+      editor: 1,
+      proprietario: 2,
+    };
+    return role !== null && rank[role] >= rank[minRole];
+  },
 }));
 
 vi.mock("./db", () => database);
@@ -87,7 +95,7 @@ describe("utilizadores de domínio e propriedades", () => {
   });
 
   it("vincula coproprietários apenas a uma propriedade da conta autenticada", async () => {
-    database.getOwnedProperty.mockResolvedValue({ id: 8, ownerId: 42, name: "Fazenda Aurora" });
+    database.getEffectiveRole.mockResolvedValue("proprietario");
     database.addUsersToProperty.mockResolvedValue([{ cpf: "11144477735", name: "João Silva" }]);
     const caller = appRouter.createCaller(createAuthenticatedContext());
 

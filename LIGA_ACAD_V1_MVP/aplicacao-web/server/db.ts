@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import {
   financialEntries,
   InsertUser,
+  propertyMembers,
   ruralProperties,
   usuarioPropriedade,
   usuarios,
@@ -339,6 +340,257 @@ export async function addUsersToProperty(
     }
   });
   return listPropertyDomainUsers(propertyId);
+}
+
+export type EffectiveRole = "proprietario" | "editor" | "visualizador";
+export type PropertyWithRole = RuralPropertyRow & { effectiveRole: EffectiveRole };
+type RuralPropertyRow = typeof ruralProperties.$inferSelect;
+
+const roleRank: Record<EffectiveRole, number> = {
+  visualizador: 0,
+  editor: 1,
+  proprietario: 2,
+};
+
+export function roleMeets(role: EffectiveRole | null, minRole: EffectiveRole) {
+  return role !== null && roleRank[role] >= roleRank[minRole];
+}
+
+export async function getEffectiveRole(
+  propertyId: number,
+  userId: number
+): Promise<EffectiveRole | null> {
+  const db = await requireDb();
+  const property = await db
+    .select({ ownerId: ruralProperties.ownerId })
+    .from(ruralProperties)
+    .where(
+      and(
+        eq(ruralProperties.id, propertyId),
+        eq(ruralProperties.isActive, true)
+      )
+    )
+    .limit(1);
+  if (!property.length) return null;
+  if (property[0].ownerId === userId) return "proprietario";
+
+  const membership = await db
+    .select({ role: propertyMembers.role })
+    .from(propertyMembers)
+    .where(
+      and(
+        eq(propertyMembers.propertyId, propertyId),
+        eq(propertyMembers.userId, userId),
+        eq(propertyMembers.status, "ativo")
+      )
+    )
+    .limit(1);
+  return membership[0]?.role ?? null;
+}
+
+export async function listPropertiesForUser(
+  userId: number
+): Promise<PropertyWithRole[]> {
+  const db = await requireDb();
+  const owned = await db
+    .select()
+    .from(ruralProperties)
+    .where(
+      and(
+        eq(ruralProperties.ownerId, userId),
+        eq(ruralProperties.isActive, true)
+      )
+    );
+  const memberRows = await db
+    .select({ property: ruralProperties, role: propertyMembers.role })
+    .from(propertyMembers)
+    .innerJoin(
+      ruralProperties,
+      eq(propertyMembers.propertyId, ruralProperties.id)
+    )
+    .where(
+      and(
+        eq(propertyMembers.userId, userId),
+        eq(propertyMembers.status, "ativo"),
+        eq(ruralProperties.isActive, true)
+      )
+    );
+
+  const byId = new Map<number, PropertyWithRole>();
+  for (const property of owned) {
+    byId.set(property.id, { ...property, effectiveRole: "proprietario" });
+  }
+  for (const { property, role } of memberRows) {
+    if (!byId.has(property.id)) {
+      byId.set(property.id, { ...property, effectiveRole: role });
+    }
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+}
+
+export async function listPropertyMembers(propertyId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: propertyMembers.id,
+      role: propertyMembers.role,
+      status: propertyMembers.status,
+      invitedEmail: propertyMembers.invitedEmail,
+      userId: propertyMembers.userId,
+      name: users.name,
+      createdAt: propertyMembers.createdAt,
+      updatedAt: propertyMembers.updatedAt,
+    })
+    .from(propertyMembers)
+    .leftJoin(users, eq(propertyMembers.userId, users.id))
+    .where(eq(propertyMembers.propertyId, propertyId))
+    .orderBy(desc(propertyMembers.createdAt));
+}
+
+export async function createOrRefreshInvite(
+  propertyId: number,
+  invitedEmail: string,
+  role: EffectiveRole,
+  invitedById: number
+) {
+  const db = await requireDb();
+  const matchedUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, invitedEmail))
+    .limit(1);
+  const userId = matchedUser[0]?.id ?? null;
+
+  const existing = await db
+    .select({ id: propertyMembers.id, status: propertyMembers.status })
+    .from(propertyMembers)
+    .where(
+      and(
+        eq(propertyMembers.propertyId, propertyId),
+        eq(propertyMembers.invitedEmail, invitedEmail)
+      )
+    )
+    .limit(1);
+
+  if (existing.length) {
+    const nextStatus = existing[0].status === "ativo" ? "ativo" : "pendente";
+    await db
+      .update(propertyMembers)
+      .set({ role, status: nextStatus, userId, updatedAt: new Date() })
+      .where(eq(propertyMembers.id, existing[0].id));
+  } else {
+    await db.insert(propertyMembers).values({
+      propertyId,
+      invitedEmail,
+      role,
+      userId,
+      invitedById,
+      status: "pendente",
+    });
+  }
+
+  return listPropertyMembers(propertyId);
+}
+
+export async function listPendingInvitesForEmail(email: string) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: propertyMembers.id,
+      role: propertyMembers.role,
+      propertyId: propertyMembers.propertyId,
+      propertyName: ruralProperties.name,
+      createdAt: propertyMembers.createdAt,
+    })
+    .from(propertyMembers)
+    .innerJoin(
+      ruralProperties,
+      eq(propertyMembers.propertyId, ruralProperties.id)
+    )
+    .where(
+      and(
+        eq(propertyMembers.invitedEmail, email),
+        eq(propertyMembers.status, "pendente"),
+        eq(ruralProperties.isActive, true)
+      )
+    )
+    .orderBy(desc(propertyMembers.createdAt));
+}
+
+export async function acceptInvite(
+  memberId: number,
+  userId: number,
+  email: string
+) {
+  const db = await requireDb();
+  const result = await db
+    .update(propertyMembers)
+    .set({ userId, status: "ativo", updatedAt: new Date() })
+    .where(
+      and(
+        eq(propertyMembers.id, memberId),
+        eq(propertyMembers.invitedEmail, email),
+        eq(propertyMembers.status, "pendente")
+      )
+    )
+    .returning({ id: propertyMembers.id });
+  return result[0] ?? null;
+}
+
+export async function declineInvite(
+  memberId: number,
+  userId: number,
+  email: string
+) {
+  const db = await requireDb();
+  const result = await db
+    .update(propertyMembers)
+    .set({ status: "recusado", updatedAt: new Date() })
+    .where(
+      and(
+        eq(propertyMembers.id, memberId),
+        eq(propertyMembers.invitedEmail, email),
+        eq(propertyMembers.status, "pendente")
+      )
+    )
+    .returning({ id: propertyMembers.id });
+  return result[0] ?? null;
+}
+
+export async function updateMemberRole(
+  propertyId: number,
+  memberId: number,
+  role: EffectiveRole
+) {
+  const db = await requireDb();
+  const result = await db
+    .update(propertyMembers)
+    .set({ role, updatedAt: new Date() })
+    .where(
+      and(
+        eq(propertyMembers.id, memberId),
+        eq(propertyMembers.propertyId, propertyId)
+      )
+    )
+    .returning({ id: propertyMembers.id });
+  return result[0] ?? null;
+}
+
+export async function revokeMember(propertyId: number, memberId: number) {
+  const db = await requireDb();
+  const result = await db
+    .update(propertyMembers)
+    .set({ status: "revogado", updatedAt: new Date() })
+    .where(
+      and(
+        eq(propertyMembers.id, memberId),
+        eq(propertyMembers.propertyId, propertyId)
+      )
+    )
+    .returning({ id: propertyMembers.id });
+  return result[0] ?? null;
 }
 
 type PropertyDeactivationDatabase = {

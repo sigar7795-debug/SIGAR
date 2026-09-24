@@ -1,22 +1,31 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  acceptInvite,
   addUsersToProperty,
   createDomainUser,
   createFinancialEntry,
+  createOrRefreshInvite,
   createPropertyWithUsers,
   deactivateProperty,
+  declineInvite,
   deleteFinancialEntry,
+  type EffectiveRole,
   getActivePropertyById,
-  getOwnedProperty,
+  getEffectiveRole,
   getPropertyEntry,
   getUserProfile,
   listDomainUsersByCreator,
-  listPropertiesByOwner,
+  listPendingInvitesForEmail,
+  listPropertiesForUser,
   listPropertyDomainUsers,
   listPropertyEntries,
+  listPropertyMembers,
+  revokeMember,
+  roleMeets,
   saveUserProfile,
   updateFinancialEntry,
+  updateMemberRole,
 } from "../db.js";
 import { protectedProcedure, router } from "../_core/trpc.js";
 import {
@@ -39,12 +48,16 @@ import {
   demoDomainUsers,
   demoProfile,
   demoProperties,
+  getDemoPropertyMembers,
   getDemoPropertyUsers,
+  inviteDemoPropertyMember,
   isDemoOpenId,
   linkDemoPropertyUsers,
   listDemoEntries,
+  revokeDemoPropertyMember,
   saveDemoProfile,
   updateDemoFinancialEntry,
+  updateDemoPropertyMemberRole,
 } from "../demo.js";
 
 const profileRoles = [
@@ -95,6 +108,13 @@ const domainUserSexes = [
   "outro",
   "nao_informar",
 ] as const;
+const memberRoles = ["proprietario", "editor", "visualizador"] as const;
+const memberEmailInput = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(320)
+  .email("E-mail inválido.");
 
 const propertyInput = z.object({
   name: z.string().trim().min(3).max(140),
@@ -179,17 +199,27 @@ export function canDeactivateProperty(
   );
 }
 
-async function assertPropertyOwnership(propertyId: number, ownerId: number) {
-  const property = await getOwnedProperty(propertyId, ownerId);
-  return ensurePropertyOwnership(property);
+async function assertPropertyAccess(
+  propertyId: number,
+  userId: number,
+  minRole: EffectiveRole
+) {
+  const role = await getEffectiveRole(propertyId, userId);
+  if (!roleMeets(role, minRole)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Não tem acesso a esta propriedade.",
+    });
+  }
+  return role as EffectiveRole;
 }
 
-async function assertEntryOwnership(
+async function assertEntryAccess(
   entryId: number,
   propertyId: number,
-  ownerId: number
+  userId: number
 ) {
-  await assertPropertyOwnership(propertyId, ownerId);
+  await assertPropertyAccess(propertyId, userId, "editor");
   return ensurePropertyOwnership(await getPropertyEntry(entryId, propertyId));
 }
 
@@ -210,7 +240,8 @@ async function assertPropertyRemovalPermission(
     return ensurePropertyOwnership(await getActivePropertyById(propertyId));
   }
 
-  return assertPropertyOwnership(propertyId, userId);
+  await assertPropertyAccess(propertyId, userId, "proprietario");
+  return ensurePropertyOwnership(await getActivePropertyById(propertyId));
 }
 
 function applyEntryFilters<
@@ -311,9 +342,10 @@ export const financeRouter = router({
           .map(property => ({
             ...property,
             domainUsers: getDemoPropertyUsers(property.id),
+            effectiveRole: "proprietario" as const,
           }));
       }
-      const properties = await listPropertiesByOwner(ctx.user.id);
+      const properties = await listPropertiesForUser(ctx.user.id);
       return Promise.all(
         properties.map(async property => ({
           ...property,
@@ -357,7 +389,7 @@ export const financeRouter = router({
         if (isDemoOpenId(ctx.user.openId)) {
           return getDemoPropertyUsers(input.propertyId);
         }
-        await assertPropertyOwnership(input.propertyId, ctx.user.id);
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "visualizador");
         return listPropertyDomainUsers(input.propertyId);
       }),
     linkUsers: protectedProcedure
@@ -375,7 +407,7 @@ export const financeRouter = router({
         if (isDemoOpenId(ctx.user.openId)) {
           return linkDemoPropertyUsers(input.propertyId, input.userCpfs);
         }
-        await assertPropertyOwnership(input.propertyId, ctx.user.id);
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
         try {
           return await addUsersToProperty(
             input.propertyId,
@@ -415,7 +447,11 @@ export const financeRouter = router({
         const entries = isDemoOpenId(ctx.user.openId)
           ? listDemoEntries(input.propertyId, period.startDate, period.endDate)
           : await (async () => {
-              await assertPropertyOwnership(input.propertyId, ctx.user.id);
+              await assertPropertyAccess(
+                input.propertyId,
+                ctx.user.id,
+                "visualizador"
+              );
               return listPropertyEntries(
                 input.propertyId,
                 period.startDate,
@@ -444,7 +480,7 @@ export const financeRouter = router({
             ...entryValues(input),
           });
         }
-        await assertPropertyOwnership(input.propertyId, ctx.user.id);
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
         return createFinancialEntry({
           propertyId: input.propertyId,
           createdById: ctx.user.id,
@@ -457,11 +493,7 @@ export const financeRouter = router({
         if (isDemoOpenId(ctx.user.openId)) {
           return updateDemoFinancialEntry(input.entryId, entryValues(input));
         }
-        await assertEntryOwnership(
-          input.entryId,
-          input.propertyId,
-          ctx.user.id
-        );
+        await assertEntryAccess(input.entryId, input.propertyId, ctx.user.id);
         return updateFinancialEntry(input.entryId, entryValues(input));
       }),
     delete: protectedProcedure
@@ -475,11 +507,7 @@ export const financeRouter = router({
         if (isDemoOpenId(ctx.user.openId)) {
           return deleteDemoFinancialEntry(input.entryId);
         }
-        await assertEntryOwnership(
-          input.entryId,
-          input.propertyId,
-          ctx.user.id
-        );
+        await assertEntryAccess(input.entryId, input.propertyId, ctx.user.id);
         await deleteFinancialEntry(input.entryId);
         return { id: input.entryId, deleted: true };
       }),
@@ -507,7 +535,11 @@ export const financeRouter = router({
               ),
             ]
           : await (async () => {
-              await assertPropertyOwnership(input.propertyId, ctx.user.id);
+              await assertPropertyAccess(
+                input.propertyId,
+                ctx.user.id,
+                "visualizador"
+              );
               return Promise.all([
                 listPropertyEntries(
                   input.propertyId,
@@ -536,6 +568,144 @@ export const financeRouter = router({
           ),
           activitySummaries: calculateActivitySummaries(filteredEntries),
         };
+      }),
+  }),
+  members: router({
+    list: protectedProcedure
+      .input(z.object({ propertyId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return getDemoPropertyMembers(input.propertyId);
+        }
+        await assertPropertyAccess(
+          input.propertyId,
+          ctx.user.id,
+          "visualizador"
+        );
+        return listPropertyMembers(input.propertyId);
+      }),
+    invite: protectedProcedure
+      .input(
+        z.object({
+          propertyId: z.number().int().positive(),
+          email: memberEmailInput,
+          role: z.enum(memberRoles),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return inviteDemoPropertyMember(
+            input.propertyId,
+            input.email,
+            input.role
+          );
+        }
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
+        return createOrRefreshInvite(
+          input.propertyId,
+          input.email,
+          input.role,
+          ctx.user.id
+        );
+      }),
+    updateRole: protectedProcedure
+      .input(
+        z.object({
+          propertyId: z.number().int().positive(),
+          memberId: z.number().int().positive(),
+          role: z.enum(memberRoles),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return updateDemoPropertyMemberRole(
+            input.propertyId,
+            input.memberId,
+            input.role
+          );
+        }
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
+        const updated = await updateMemberRole(
+          input.propertyId,
+          input.memberId,
+          input.role
+        );
+        if (!updated) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Membro não encontrado.",
+          });
+        }
+        return listPropertyMembers(input.propertyId);
+      }),
+    revoke: protectedProcedure
+      .input(
+        z.object({
+          propertyId: z.number().int().positive(),
+          memberId: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          return revokeDemoPropertyMember(input.propertyId, input.memberId);
+        }
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
+        const revoked = await revokeMember(input.propertyId, input.memberId);
+        if (!revoked) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Membro não encontrado.",
+          });
+        }
+        return listPropertyMembers(input.propertyId);
+      }),
+    pendingInvites: protectedProcedure.query(async ({ ctx }) => {
+      if (isDemoOpenId(ctx.user.openId) || !ctx.user.email) return [];
+      return listPendingInvitesForEmail(ctx.user.email.toLowerCase());
+    }),
+    acceptInvite: protectedProcedure
+      .input(z.object({ memberId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId) || !ctx.user.email) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Convites não estão disponíveis no modo de demonstração.",
+          });
+        }
+        const accepted = await acceptInvite(
+          input.memberId,
+          ctx.user.id,
+          ctx.user.email.toLowerCase()
+        );
+        if (!accepted) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Convite não encontrado ou já respondido.",
+          });
+        }
+        return { id: accepted.id, accepted: true };
+      }),
+    declineInvite: protectedProcedure
+      .input(z.object({ memberId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId) || !ctx.user.email) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Convites não estão disponíveis no modo de demonstração.",
+          });
+        }
+        const declined = await declineInvite(
+          input.memberId,
+          ctx.user.id,
+          ctx.user.email.toLowerCase()
+        );
+        if (!declined) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Convite não encontrado ou já respondido.",
+          });
+        }
+        return { id: declined.id, declined: true };
       }),
   }),
 });

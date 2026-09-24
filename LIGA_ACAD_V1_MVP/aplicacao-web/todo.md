@@ -51,4 +51,10 @@
 - [x] Criar testes para CPF, cadastro, vínculos e bloqueio de criação de propriedade sem utilizador.
 - [x] Validar visualmente o novo fluxo de utilizador e propriedades em computador e telemóvel.
 - [x] Registar a revisão visual manual do fluxo de utilizadores e propriedades em computador e telemóvel.
+- [x] Criar a tabela `propertyMembers`, ligando conta autenticada, propriedade e papel de acesso sem depender do CPF.
+- [x] Implementar convite, aceitação e recusa de vínculo de conta autenticada a uma propriedade, com papéis proprietário, editor e visualizador.
+- [x] Permitir que o proprietário conceda, altere e revogue permissões de membros.
+- [x] Substituir a checagem de titularidade estrita por permissão efetiva em todas as consultas e mutações financeiras.
+- [x] Mostrar na interface os membros de cada propriedade, o papel de cada um e o estado do convite.
+- [x] Criar testes que impeçam leitura e edição não autorizadas por papel de acesso.
 - [ ] Sincronizar as alterações recentes de fluxo financeiro e utilizadores no repositório GitHub igorCruz23/projeto_liga_academica e criar um commit descritivo.

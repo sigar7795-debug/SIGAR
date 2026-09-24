@@ -133,6 +133,57 @@ export const usuarioPropriedade = pgTable(
   ]
 );
 
+/** Papel de acesso de uma conta autenticada a uma propriedade. */
+export const propertyMemberRole = pgEnum("property_member_role", [
+  "proprietario",
+  "editor",
+  "visualizador",
+]);
+
+/** Estado do vínculo/convite de uma conta autenticada a uma propriedade. */
+export const propertyMemberStatus = pgEnum("property_member_status", [
+  "pendente",
+  "ativo",
+  "revogado",
+  "recusado",
+]);
+
+/**
+ * Vínculo entre uma conta autenticada (`users`) e uma propriedade, com papel
+ * de acesso. Distinto de `usuarioPropriedade`, que liga pessoas físicas por
+ * CPF (`usuarios`) sem conceder acesso. O titular técnico
+ * (`ruralProperties.ownerId`) é sempre proprietário implícito e não precisa
+ * de linha aqui.
+ */
+export const propertyMembers = pgTable(
+  "propertyMembers",
+  {
+    id: serial("id").primaryKey(),
+    propertyId: integer("propertyId")
+      .notNull()
+      .references(() => ruralProperties.id, { onDelete: "cascade" }),
+    userId: integer("userId").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    invitedEmail: varchar("invitedEmail", { length: 320 }).notNull(),
+    role: propertyMemberRole("role").notNull(),
+    status: propertyMemberStatus("status").notNull().default("pendente"),
+    invitedById: integer("invitedById")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt,
+    updatedAt,
+  },
+  table => [
+    uniqueIndex("property_members_property_email_unique").on(
+      table.propertyId,
+      table.invitedEmail
+    ),
+    index("property_members_property_idx").on(table.propertyId),
+    index("property_members_user_idx").on(table.userId),
+  ]
+);
+
 export const financialEntryType = pgEnum("financial_entry_type", [
   "receita",
   "custo_producao",
@@ -195,5 +246,6 @@ export const financialEntries = pgTable(
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type Usuario = typeof usuarios.$inferSelect;
 export type UsuarioPropriedade = typeof usuarioPropriedade.$inferSelect;
+export type PropertyMember = typeof propertyMembers.$inferSelect;
 export type RuralProperty = typeof ruralProperties.$inferSelect;
 export type FinancialEntry = typeof financialEntries.$inferSelect;
