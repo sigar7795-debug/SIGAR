@@ -58,3 +58,9 @@
 - [x] Mostrar na interface os membros de cada propriedade, o papel de cada um e o estado do convite.
 - [x] Criar testes que impeçam leitura e edição não autorizadas por papel de acesso.
 - [ ] Sincronizar as alterações recentes de fluxo financeiro e utilizadores no repositório GitHub igorCruz23/projeto_liga_academica e criar um commit descritivo.
+- [x] Implementar a solicitação de redefinição de senha por e-mail sem revelar se a conta existe (RF03).
+- [x] Validar o link de redefinição (tipo e expiração do token) e permitir definir a nova senha em `/redefinir-senha`.
+- [x] Tornar funcional a troca de senha em **Meu perfil**, com confirmação da senha atual.
+- [x] Registar eventos de segurança de senha na tabela `securityEvents` sem guardar senha, token ou e-mail em claro.
+- [x] Cobrir em testes os fluxos de redefinição, troca de senha e auditoria.
+- [ ] Aplicar a migração `20260925120000_security_events.sql` no Supabase e liberar `/redefinir-senha` nas Redirect URLs.

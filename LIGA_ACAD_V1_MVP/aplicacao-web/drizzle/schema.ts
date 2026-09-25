@@ -244,9 +244,46 @@ export const financialEntries = pgTable(
   ]
 );
 
+export const securityEventType = pgEnum("security_event_type", [
+  "password_reset_requested",
+  "password_reset_completed",
+  "password_reset_failed",
+  "password_change_completed",
+  "password_change_failed",
+]);
+
+/**
+ * Trilha de eventos de segurança da conta (RF03). Nunca guarda senha, token
+ * ou e-mail em claro: o e-mail vira HMAC para permitir correlação sem expor
+ * quem pediu a redefinição.
+ */
+export const securityEvents = pgTable(
+  "securityEvents",
+  {
+    id: serial("id").primaryKey(),
+    eventType: securityEventType("eventType").notNull(),
+    userId: integer("userId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    emailHash: varchar("emailHash", { length: 64 }),
+    reason: varchar("reason", { length: 64 }),
+    ipAddress: varchar("ipAddress", { length: 64 }),
+    createdAt,
+  },
+  table => [
+    index("security_events_user_idx").on(table.userId),
+    index("security_events_type_created_idx").on(
+      table.eventType,
+      table.createdAt
+    ),
+  ]
+);
+
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type Usuario = typeof usuarios.$inferSelect;
 export type UsuarioPropriedade = typeof usuarioPropriedade.$inferSelect;
 export type PropertyMember = typeof propertyMembers.$inferSelect;
 export type RuralProperty = typeof ruralProperties.$inferSelect;
 export type FinancialEntry = typeof financialEntries.$inferSelect;
+export type SecurityEventType = (typeof securityEventType.enumValues)[number];
+export type InsertSecurityEvent = typeof securityEvents.$inferInsert;

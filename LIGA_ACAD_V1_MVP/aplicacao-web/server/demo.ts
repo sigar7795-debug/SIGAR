@@ -1,3 +1,4 @@
+import { DEMO_LOGIN_METHOD } from "../shared/const.js";
 import type {
   FinancialEntry,
   RuralProperty,
@@ -39,7 +40,7 @@ export function buildDemoUser(openId: string, name: string): User {
     openId,
     name,
     email,
-    loginMethod: "demonstracao",
+    loginMethod: DEMO_LOGIN_METHOD,
     role: "user",
     createdAt: now,
     updatedAt: now,

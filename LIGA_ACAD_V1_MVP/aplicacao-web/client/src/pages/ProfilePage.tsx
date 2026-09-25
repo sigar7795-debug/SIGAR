@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
+import { DEMO_LOGIN_METHOD } from "@shared/const";
+import { getNewPasswordError, getPasswordConfirmationError, PASSWORD_MIN_LENGTH, SAME_PASSWORD_ERROR } from "@shared/passwordPolicy";
 import { Bell, BriefcaseBusiness, Building2, GraduationCap, LockKeyhole, Pencil, Phone, Save, Sprout, UserCog, UsersRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const roles = [
@@ -30,17 +32,11 @@ export default function ProfilePage() {
   const [organization, setOrganization] = useState("SIGAR Rural");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [financialAlerts, setFinancialAlerts] = useState(true);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   const saveProfile = trpc.finance.profile.save.useMutation({
     onSuccess: () => {
       void utils.finance.profile.get.invalidate();
       setEditing(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
       toast.success("Alterações salvas.");
     },
     onError: error => toast.error(error.message),
@@ -54,10 +50,6 @@ export default function ProfilePage() {
   if (profileQuery.isError) return <QueryErrorState onRetry={() => { void profileQuery.refetch(); }} />;
 
   const saveChanges = () => {
-    if (newPassword && newPassword !== confirmPassword) {
-      toast.error("A confirmação da nova senha não coincide.");
-      return;
-    }
     saveProfile.mutate({ profileRole: role });
   };
 
@@ -130,15 +122,6 @@ export default function ProfilePage() {
         </article>
       </section>
 
-      <section className="border-t border-olive/35 pt-6">
-        <div className="flex items-center gap-3"><LockKeyhole className="h-5 w-5 text-olive" /><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">Segurança</p><h2 className="mt-1 font-display text-2xl font-bold">Alteração de senha</h2></div></div>
-        <div className="mt-6 grid gap-5 sm:grid-cols-3">
-          <PasswordField label="Senha atual" value={currentPassword} onChange={setCurrentPassword} />
-          <PasswordField label="Nova senha" value={newPassword} onChange={setNewPassword} />
-          <PasswordField label="Confirmar nova senha" value={confirmPassword} onChange={setConfirmPassword} />
-        </div>
-      </section>
-
       <div className="flex justify-end border-t border-olive/35 pt-6">
         <Button
           type="button"
@@ -149,7 +132,64 @@ export default function ProfilePage() {
           <Save className="mr-2 h-4 w-4" /> {saveProfile.isPending ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>
+
+      <PasswordChangeSection isDemo={user?.loginMethod === DEMO_LOGIN_METHOD} />
     </div>
+  );
+}
+
+function PasswordChangeSection({ isDemo }: { isDemo: boolean }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState<{ current?: string | null; next?: string | null; confirmation?: string | null }>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const changePassword = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Senha alterada com sucesso. Use a nova senha no próximo acesso.");
+    },
+    onError: error => setFormError(error.data ? error.message : "Não foi possível falar com o servidor. Verifique sua conexão e tente novamente."),
+  });
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextErrors = {
+      current: currentPassword ? null : "Informe a senha atual.",
+      next: getNewPasswordError(newPassword) ?? (newPassword === currentPassword ? SAME_PASSWORD_ERROR : null),
+      confirmation: getPasswordConfirmationError(newPassword, confirmPassword),
+    };
+    setErrors(nextErrors);
+    setFormError(null);
+    if (nextErrors.current || nextErrors.next || nextErrors.confirmation) return;
+    changePassword.mutate({ currentPassword, newPassword });
+  };
+
+  return (
+    <section className="border-t border-olive/35 pt-6">
+      <div className="flex items-center gap-3"><LockKeyhole className="h-5 w-5 text-olive" /><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">Segurança</p><h2 className="mt-1 font-display text-2xl font-bold">Alteração de senha</h2></div></div>
+      {isDemo ? (
+        <p className="mt-6 border-l-2 border-olive/40 bg-card px-5 py-4 text-sm text-graphite/70">A conta de demonstração não possui senha. Crie uma conta para definir e alterar a sua senha.</p>
+      ) : (
+        <form onSubmit={submit} noValidate>
+          <p className="mt-3 text-sm text-graphite/60">Confirme a senha atual e escolha uma nova com pelo menos {PASSWORD_MIN_LENGTH} caracteres.</p>
+          <div className="mt-6 grid gap-5 sm:grid-cols-3">
+            <PasswordField id="current-password" label="Senha atual" autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} error={errors.current} />
+            <PasswordField id="new-password" label="Nova senha" autoComplete="new-password" value={newPassword} onChange={setNewPassword} error={errors.next} />
+            <PasswordField id="confirm-password" label="Confirmar nova senha" autoComplete="new-password" value={confirmPassword} onChange={setConfirmPassword} error={errors.confirmation} />
+          </div>
+          {formError ? <p role="alert" className="mt-5 border-l-2 border-destructive bg-destructive/5 px-5 py-3 text-sm text-graphite/80">{formError}</p> : null}
+          <div className="mt-6 flex justify-end">
+            <Button type="submit" disabled={changePassword.isPending} className="h-12 rounded-none bg-field px-7 font-semibold text-sand hover:bg-field/90">
+              <LockKeyhole className="mr-2 h-4 w-4" /> {changePassword.isPending ? "Alterando..." : "Alterar senha"}
+            </Button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 
@@ -188,11 +228,26 @@ function ProfileField({
   );
 }
 
-function PasswordField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function PasswordField({
+  id,
+  label,
+  autoComplete,
+  value,
+  onChange,
+  error,
+}: {
+  id: string;
+  label: string;
+  autoComplete: "current-password" | "new-password";
+  value: string;
+  onChange: (value: string) => void;
+  error?: string | null;
+}) {
   return (
     <div>
-      <Label className="mb-2 block font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">{label}</Label>
-      <Input type="password" autoComplete="new-password" value={value} onChange={event => onChange(event.target.value)} className="h-11 rounded-none border-0 border-b border-olive/40 bg-transparent px-0 shadow-none focus-visible:ring-0" />
+      <Label htmlFor={id} className="mb-2 block font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">{label}</Label>
+      <Input id={id} type="password" autoComplete={autoComplete} value={value} onChange={event => onChange(event.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined} className="h-11 rounded-none border-0 border-b border-olive/40 bg-transparent px-0 shadow-none focus-visible:ring-0" />
+      {error ? <p id={`${id}-error`} className="mt-2 text-xs font-medium text-destructive">{error}</p> : null}
     </div>
   );
 }

@@ -1,22 +1,34 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
+import {
+  getNewPasswordError,
+  SAME_PASSWORD_ERROR,
+} from "../shared/passwordPolicy.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db.js";
 import type { TrpcContext } from "./_core/context.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
+import { ENV } from "./_core/env.js";
 import { sdk } from "./_core/sdk.js";
 import { systemRouter } from "./_core/systemRouter.js";
-import { publicProcedure, router } from "./_core/trpc.js";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc.js";
 import {
   buildDemoUser,
   createDemoOpenId,
   getDemoName,
+  isDemoOpenId,
 } from "./demo.js";
 import { financeRouter } from "./routers/finance.js";
+import { recordSecurityEvent } from "./securityEvents.js";
 import {
+  changePasswordWithSupabase,
   getSupabaseUserName,
+  PasswordFlowError,
+  resetPasswordWithRecoveryToken,
+  sendPasswordResetEmail,
   signInWithSupabase,
   signUpWithSupabase,
+  verifyPasswordResetToken,
 } from "./supabaseAuth.js";
 
 const authInput = z.object({
@@ -24,6 +36,31 @@ const authInput = z.object({
   password: z.string().min(8).max(128),
   remember: z.boolean().default(true),
 });
+
+// Tokens do link de recuperação: só trafegam no corpo de mutations (POST),
+// nunca na URL, para não aparecerem em logs de acesso.
+const recoveryAccessToken = z.string().min(1).max(4096);
+const recoveryRefreshToken = z.string().min(1).max(512);
+const passwordInput = z.string().max(256);
+
+function assertNewPassword(password: string) {
+  const policyError = getNewPasswordError(password);
+  if (policyError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: policyError });
+  }
+}
+
+function passwordFailureReason(error: unknown) {
+  return error instanceof PasswordFlowError ? error.reason : "provider_error";
+}
+
+function getPasswordResetRedirectUrl(req: TrpcContext["req"]) {
+  const baseUrl =
+    ENV.appUrl ||
+    (req.headers.host ? `${req.protocol}://${req.headers.host}` : "");
+  // Sem URL, o Supabase usa o Site URL; a página inicial reencaminha o link.
+  return baseUrl ? new URL("/redefinir-senha", baseUrl).toString() : undefined;
+}
 
 async function persistAuthenticatedUser(
   supabaseUser: Awaited<ReturnType<typeof signInWithSupabase>>
@@ -125,6 +162,116 @@ export const appRouter = router({
           requiresEmailConfirmation: false as const,
           user,
         };
+      }),
+    requestPasswordReset: publicProcedure
+      .input(z.object({ email: z.string().trim().email().max(320) }))
+      .mutation(async ({ ctx, input }) => {
+        const { reason } = await sendPasswordResetEmail(
+          input.email,
+          getPasswordResetRedirectUrl(ctx.req)
+        );
+        await recordSecurityEvent(ctx, {
+          type: "password_reset_requested",
+          email: input.email,
+          reason,
+        });
+        // A resposta é sempre a mesma para não revelar se a conta existe.
+        return { success: true } as const;
+      }),
+    validatePasswordReset: publicProcedure
+      .input(z.object({ accessToken: recoveryAccessToken }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          await verifyPasswordResetToken(input.accessToken);
+        } catch (error) {
+          await recordSecurityEvent(ctx, {
+            type: "password_reset_failed",
+            reason: passwordFailureReason(error),
+          });
+          throw error;
+        }
+        return { valid: true } as const;
+      }),
+    resetPassword: publicProcedure
+      .input(
+        z.object({
+          accessToken: recoveryAccessToken,
+          refreshToken: recoveryRefreshToken,
+          password: passwordInput,
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        assertNewPassword(input.password);
+        let supabaseUser: Awaited<
+          ReturnType<typeof resetPasswordWithRecoveryToken>
+        >;
+        try {
+          supabaseUser = await resetPasswordWithRecoveryToken(
+            input.accessToken,
+            input.refreshToken,
+            input.password
+          );
+        } catch (error) {
+          await recordSecurityEvent(ctx, {
+            type: "password_reset_failed",
+            reason: passwordFailureReason(error),
+          });
+          throw error;
+        }
+        await recordSecurityEvent(ctx, {
+          type: "password_reset_completed",
+          openId: supabaseUser.id,
+          email: supabaseUser.email,
+        });
+        return { success: true } as const;
+      }),
+    changePassword: protectedProcedure
+      .input(
+        z.object({
+          currentPassword: passwordInput.min(1),
+          newPassword: passwordInput,
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (isDemoOpenId(ctx.user.openId)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "A conta de demonstração não possui senha para alterar.",
+          });
+        }
+        if (!ctx.user.email) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Esta conta não possui e-mail para confirmar a senha.",
+          });
+        }
+        assertNewPassword(input.newPassword);
+        if (input.newPassword === input.currentPassword) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: SAME_PASSWORD_ERROR,
+          });
+        }
+
+        try {
+          await changePasswordWithSupabase(
+            ctx.user.email,
+            input.currentPassword,
+            input.newPassword
+          );
+        } catch (error) {
+          await recordSecurityEvent(ctx, {
+            type: "password_change_failed",
+            userId: ctx.user.id,
+            reason: passwordFailureReason(error),
+          });
+          throw error;
+        }
+        await recordSecurityEvent(ctx, {
+          type: "password_change_completed",
+          userId: ctx.user.id,
+        });
+        return { success: true } as const;
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

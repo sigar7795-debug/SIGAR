@@ -13,6 +13,7 @@ import Home from "./pages/Home";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import PropertiesPage from "./pages/PropertiesPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 function DashboardRoute() {
   return <DashboardLayout><DashboardPage /></DashboardLayout>;
@@ -36,6 +37,7 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/login"} component={LoginPage} />
+      <Route path={"/redefinir-senha"} component={ResetPasswordPage} />
       <Route path={"/dashboard"} component={DashboardRoute} />
       <Route path={"/propriedades"} component={PropertiesRoute} />
       <Route path={"/fluxo-de-caixa"} component={CashFlowRoute} />
