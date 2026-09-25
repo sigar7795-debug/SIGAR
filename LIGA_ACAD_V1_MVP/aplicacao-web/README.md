@@ -7,6 +7,7 @@ O **Liga Rural** é uma aplicação web de gestão financeira para propriedades 
 | Área | Entrega disponível |
 |---|---|
 | Identidade de uso | Perfil de utilizador entre produtor, gestor, estudante, consultor e administrador. |
+| Acesso e senha | Login por e-mail e senha, redefinição por link enviado ao e-mail e troca de senha em **Meu perfil** (ver [docs/redefinicao-senha-rf03.md](docs/redefinicao-senha-rf03.md)). |
 | Propriedades | Cadastro de uma ou mais propriedades vinculadas ao utilizador autenticado. |
 | Lançamentos | Registro de receitas, custos de produção, despesas administrativas, impostos e deduções. |
 | Fluxo de caixa | Filtros por dia, mês, trimestre e ano, com saldo calculado automaticamente. |
@@ -30,8 +31,10 @@ Na área **Fluxo de caixa**, crie lançamentos indicando tipo, categoria, descri
 | `pnpm check` | Executa a verificação estática de TypeScript. |
 | `pnpm build` | Gera a versão de produção. |
 
-Na validação desta versão, a suíte contém **sete testes** e cobre as fórmulas de resultado, os intervalos temporais, o encerramento de sessão e a proteção contra acessos não autenticados às rotas financeiras.
+A suíte cobre as fórmulas de resultado, os intervalos temporais, a sessão, a proteção contra acessos não autenticados às rotas financeiras e os fluxos de redefinição e troca de senha.
+
+Para a redefinição de senha funcionar em produção, libere `https://<domínio>/redefinir-senha` nas Redirect URLs do Supabase, configure um SMTP próprio e aplique a migração `supabase/migrations/20260925120000_security_events.sql`. A variável opcional `APP_URL` fixa o domínio usado nos links enviados por e-mail.
 
 ## Limites do primeiro incremento
 
-Funcionalidades previstas no documento original, como balanço patrimonial, indicadores produtivos, relatórios, exportações, importação de planilhas, permissões de colaboração por propriedade e simulações de investimento, não integram este recorte inicial. A autenticação é fornecida pela infraestrutura da plataforma; por isso, este M.V.P. não cria um fluxo próprio de e-mail e senha.
+Funcionalidades previstas no documento original, como balanço patrimonial, indicadores produtivos, relatórios, exportações, importação de planilhas, permissões de colaboração por propriedade e simulações de investimento, não integram este recorte inicial. A autenticação por e-mail e senha usa o Supabase Auth; a sessão do SIGAR é um cookie HTTP-only próprio.

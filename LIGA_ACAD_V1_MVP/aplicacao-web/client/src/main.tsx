@@ -10,6 +10,19 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+// Se o redirecionamento de redefinição não estiver liberado no Supabase, o link
+// do e-mail volta para o Site URL; reencaminha os tokens para a página certa.
+if (
+  window.location.pathname !== "/redefinir-senha" &&
+  /(^#|&)type=recovery(&|$)/.test(window.location.hash)
+) {
+  window.history.replaceState(
+    null,
+    "",
+    `/redefinir-senha${window.location.hash}`
+  );
+}
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;

@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { AuthField } from "@/components/auth/AuthField";
 import { BackgroundVideo } from "@/components/landing/BackgroundVideo";
 import {
   supportsRouteViewTransitions,
@@ -11,14 +12,31 @@ import { toast } from "sonner";
 
 const FALLBACK_EXIT_MS = 650;
 
+type AuthMode = "signin" | "signup" | "forgot";
+
+function getInitialMode(): AuthMode {
+  // /login?modo=recuperar abre direto a recuperação (ex.: link expirado).
+  return new URLSearchParams(window.location.search).get("modo") === "recuperar"
+    ? "forgot"
+    : "signin";
+}
+
 export default function LoginPage() {
   const navigate = useViewTransitionNavigate();
   const { isAuthenticated, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState<AuthMode>(getInitialMode);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetEmailError, setResetEmailError] = useState<string | null>(null);
+  const [resetRequestedFor, setResetRequestedFor] = useState<string | null>(
+    null
+  );
   const exitTimerRef = useRef<number | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const isSignUp = mode === "signup";
+  const isForgot = mode === "forgot";
   const utils = trpc.useUtils();
   const login = trpc.auth.login.useMutation({
     onSuccess: user => {
@@ -40,7 +58,7 @@ export default function LoginPage() {
     onSuccess: result => {
       if (result.requiresEmailConfirmation) {
         toast.success("Conta criada. Confirme o e-mail para entrar no SIGAR.");
-        setIsSignUp(false);
+        setMode("signin");
         return;
       }
       if (result.authenticated) {
@@ -50,6 +68,13 @@ export default function LoginPage() {
       }
     },
     onError: error => toast.error(error.message),
+  });
+  const requestPasswordReset = trpc.auth.requestPasswordReset.useMutation({
+    onSuccess: (_result, variables) => setResetRequestedFor(variables.email),
+    onError: () =>
+      toast.error(
+        "Não foi possível enviar o pedido agora. Tente novamente em instantes."
+      ),
   });
 
   useEffect(() => {
@@ -78,6 +103,24 @@ export default function LoginPage() {
       return;
     }
     login.mutate({ email, password, remember });
+  };
+
+  const handleResetRequest = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const email = resetEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setResetEmailError("Informe um e-mail válido.");
+      return;
+    }
+    setResetEmailError(null);
+    requestPasswordReset.mutate({ email });
+  };
+
+  const openForgotPassword = () => {
+    setResetEmail(emailInputRef.current?.value.trim() ?? "");
+    setResetEmailError(null);
+    setResetRequestedFor(null);
+    setMode("forgot");
   };
 
   const isSubmitting =
@@ -164,174 +207,254 @@ export default function LoginPage() {
           <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12 sm:py-14 md:py-10">
             <header>
               <h2 className="font-display text-5xl font-bold leading-none text-graphite sm:text-6xl">
-                {isSignUp ? "Crie sua conta." : "Entre no SIGAR."}
+                {isForgot
+                  ? "Redefina sua senha."
+                  : isSignUp
+                    ? "Crie sua conta."
+                    : "Entre no SIGAR."}
               </h2>
               <p className="mt-4 max-w-sm text-sm leading-relaxed text-graphite/65 sm:text-base">
-                {isSignUp
-                  ? "Comece a organizar os dados da sua propriedade."
-                  : "Acesse os dados e a gestão da sua propriedade."}
+                {isForgot
+                  ? "Informe o e-mail da sua conta. Enviaremos um link para você criar uma nova senha."
+                  : isSignUp
+                    ? "Comece a organizar os dados da sua propriedade."
+                    : "Acesse os dados e a gestão da sua propriedade."}
               </p>
             </header>
 
-            <form className="mt-10 space-y-7" onSubmit={handleSubmit}>
-              {isSignUp ? (
-                <label className="block" htmlFor="login-name">
-                  <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
-                    Nome completo
-                  </span>
-                  <span className="relative mt-2 block">
-                    <input
-                      id="login-name"
-                      name="name"
-                      type="text"
+            {isForgot ? (
+              <div className="mt-10">
+                {resetRequestedFor ? (
+                  <div
+                    role="status"
+                    className="border-l-2 border-field bg-paper/60 px-5 py-4 text-sm leading-relaxed text-graphite/80"
+                  >
+                    <p className="font-semibold text-field">
+                      Verifique seu e-mail.
+                    </p>
+                    <p className="mt-2">
+                      Se houver uma conta SIGAR associada a{" "}
+                      <span className="font-semibold break-all">
+                        {resetRequestedFor}
+                      </span>
+                      , você receberá em instantes um link para redefinir a
+                      senha. O link é válido por tempo limitado; confira também
+                      a caixa de spam.
+                    </p>
+                  </div>
+                ) : (
+                  <form
+                    className="space-y-7"
+                    onSubmit={handleResetRequest}
+                    noValidate
+                  >
+                    <AuthField
+                      id="reset-email"
+                      name="email"
+                      type="email"
+                      label="E-mail"
+                      autoComplete="email"
                       required
-                      autoComplete="name"
-                      className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
+                      value={resetEmail}
+                      onChange={event => setResetEmail(event.target.value)}
+                      error={resetEmailError}
                     />
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
-                    />
-                  </span>
-                </label>
-              ) : null}
-              <label className="block" htmlFor="login-email">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
-                  E-mail
-                </span>
-                <span className="relative mt-2 block">
-                  <input
-                    id="login-email"
-                    name="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
-                  />
-                </span>
-              </label>
+                    <button
+                      type="submit"
+                      disabled={requestPasswordReset.isPending}
+                      className="group relative flex h-13 w-full items-center justify-between overflow-hidden border border-field bg-field px-5 text-left font-semibold text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <span className="absolute inset-0 origin-left scale-x-0 bg-paper transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100" />
+                      <span className="relative z-10 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field">
+                        {requestPasswordReset.isPending
+                          ? "Enviando..."
+                          : "Enviar link de redefinição"}
+                      </span>
+                      <ArrowRight
+                        aria-hidden="true"
+                        className="relative z-10 h-4 w-4 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field"
+                      />
+                    </button>
+                  </form>
+                )}
 
-              <label className="block" htmlFor="login-password">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
-                  Senha
-                </span>
-                <span className="relative mt-2 block">
-                  <input
-                    id="login-password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={8}
-                    autoComplete="current-password"
-                    className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 pr-11 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
-                  />
+                <p className="mt-7 text-sm text-graphite/60">
+                  Lembrou a senha?{" "}
                   <button
                     type="button"
-                    onClick={() => setShowPassword(current => !current)}
-                    aria-label={
-                      showPassword ? "Ocultar senha" : "Mostrar senha"
-                    }
-                    title={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                    className="absolute bottom-2 right-0 grid h-8 w-8 place-items-center text-olive transition-colors hover:text-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+                    onClick={() => setMode("signin")}
+                    className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
                   >
-                    {showPassword ? (
-                      <EyeOff aria-hidden="true" className="h-4 w-4" />
-                    ) : (
-                      <Eye aria-hidden="true" className="h-4 w-4" />
-                    )}
+                    Voltar para o login
                   </button>
-                </span>
-              </label>
-
-              <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-                <label className="inline-flex cursor-pointer items-center gap-2.5 text-graphite/70">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={event => setRemember(event.target.checked)}
-                    className="h-4 w-4 rounded-none border-olive accent-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
-                  />
-                  Manter conectado
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    toast.info(
-                      "Solicite a redefinição de senha ao administrador do SIGAR."
-                    )
-                  }
-                  className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
-                >
-                  Esqueci minha senha
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="group relative flex h-13 w-full items-center justify-between overflow-hidden border border-field bg-field px-5 text-left font-semibold text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand"
-              >
-                <span className="absolute inset-0 origin-left scale-x-0 bg-paper transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100" />
-                <span className="relative z-10 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field">
-                  {isSubmitting
-                    ? "Aguarde..."
-                    : isSignUp
-                      ? "Criar conta"
-                      : "Entrar"}
-                </span>
-                <ArrowRight
-                  aria-hidden="true"
-                  className="relative z-10 h-4 w-4 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field"
-                />
-              </button>
-            </form>
-
-            {!isSignUp ? (
-              <div className="mt-5">
-                <div className="mb-5 flex items-center gap-3" aria-hidden="true">
-                  <span className="h-px flex-1 bg-olive/25" />
-                  <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive/70">
-                    ou
-                  </span>
-                  <span className="h-px flex-1 bg-olive/25" />
-                </div>
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => demoLogin.mutate({ remember })}
-                  className="flex h-13 w-full items-center justify-between border border-field bg-transparent px-5 text-left font-semibold text-field transition-colors hover:bg-field hover:text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand disabled:cursor-wait disabled:opacity-60"
-                >
-                  <span>
-                    {demoLogin.isPending
-                      ? "Preparando demonstração..."
-                      : "Acessar demonstração"}
-                  </span>
-                  <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                </button>
-                <p className="mt-3 text-xs leading-relaxed text-graphite/55">
-                  Explore o SIGAR com dados demonstrativos, sem criar uma conta.
                 </p>
               </div>
-            ) : null}
+            ) : (
+              <>
+                <form className="mt-10 space-y-7" onSubmit={handleSubmit}>
+                  {isSignUp ? (
+                    <label className="block" htmlFor="login-name">
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
+                        Nome completo
+                      </span>
+                      <span className="relative mt-2 block">
+                        <input
+                          id="login-name"
+                          name="name"
+                          type="text"
+                          required
+                          autoComplete="name"
+                          className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
+                        />
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
+                        />
+                      </span>
+                    </label>
+                  ) : null}
+                  <label className="block" htmlFor="login-email">
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
+                      E-mail
+                    </span>
+                    <span className="relative mt-2 block">
+                      <input
+                        ref={emailInputRef}
+                        id="login-email"
+                        name="email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
+                      />
+                    </span>
+                  </label>
 
-            <p className="mt-7 text-sm text-graphite/60">
-              {isSignUp ? "Já possui uma conta?" : "Ainda não possui acesso?"}{" "}
-              <button
-                type="button"
-                onClick={() => setIsSignUp(current => !current)}
-                className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
-              >
-                {isSignUp ? "Entrar" : "Criar conta"}
-              </button>
-            </p>
+                  <label className="block" htmlFor="login-password">
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-olive">
+                      Senha
+                    </span>
+                    <span className="relative mt-2 block">
+                      <input
+                        id="login-password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        minLength={8}
+                        autoComplete="current-password"
+                        className="peer h-11 w-full border-0 border-b border-olive/45 bg-transparent px-0 pr-11 text-base text-graphite outline-none placeholder:text-graphite/30 focus-visible:outline-none"
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-field transition-transform duration-300 ease-out peer-focus:scale-x-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(current => !current)}
+                        aria-label={
+                          showPassword ? "Ocultar senha" : "Mostrar senha"
+                        }
+                        title={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        className="absolute bottom-2 right-0 grid h-8 w-8 place-items-center text-olive transition-colors hover:text-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+                      >
+                        {showPassword ? (
+                          <EyeOff aria-hidden="true" className="h-4 w-4" />
+                        ) : (
+                          <Eye aria-hidden="true" className="h-4 w-4" />
+                        )}
+                      </button>
+                    </span>
+                  </label>
+
+                  <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+                    <label className="inline-flex cursor-pointer items-center gap-2.5 text-graphite/70">
+                      <input
+                        type="checkbox"
+                        checked={remember}
+                        onChange={event => setRemember(event.target.checked)}
+                        className="h-4 w-4 rounded-none border-olive accent-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+                      />
+                      Manter conectado
+                    </label>
+                    <button
+                      type="button"
+                      onClick={openForgotPassword}
+                      className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="group relative flex h-13 w-full items-center justify-between overflow-hidden border border-field bg-field px-5 text-left font-semibold text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand"
+                  >
+                    <span className="absolute inset-0 origin-left scale-x-0 bg-paper transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100" />
+                    <span className="relative z-10 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field">
+                      {isSubmitting
+                        ? "Aguarde..."
+                        : isSignUp
+                          ? "Criar conta"
+                          : "Entrar"}
+                    </span>
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="relative z-10 h-4 w-4 transition-colors duration-300 group-hover:text-field group-focus-visible:text-field"
+                    />
+                  </button>
+                </form>
+
+                {!isSignUp ? (
+                  <div className="mt-5">
+                    <div
+                      className="mb-5 flex items-center gap-3"
+                      aria-hidden="true"
+                    >
+                      <span className="h-px flex-1 bg-olive/25" />
+                      <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive/70">
+                        ou
+                      </span>
+                      <span className="h-px flex-1 bg-olive/25" />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => demoLogin.mutate({ remember })}
+                      className="flex h-13 w-full items-center justify-between border border-field bg-transparent px-5 text-left font-semibold text-field transition-colors hover:bg-field hover:text-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field focus-visible:ring-offset-2 focus-visible:ring-offset-sand disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <span>
+                        {demoLogin.isPending
+                          ? "Preparando demonstração..."
+                          : "Acessar demonstração"}
+                      </span>
+                      <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                    </button>
+                    <p className="mt-3 text-xs leading-relaxed text-graphite/55">
+                      Explore o SIGAR com dados demonstrativos, sem criar uma
+                      conta.
+                    </p>
+                  </div>
+                ) : null}
+
+                <p className="mt-7 text-sm text-graphite/60">
+                  {isSignUp
+                    ? "Já possui uma conta?"
+                    : "Ainda não possui acesso?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode(isSignUp ? "signin" : "signup")}
+                    className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
+                  >
+                    {isSignUp ? "Entrar" : "Criar conta"}
+                  </button>
+                </p>
+              </>
+            )}
           </div>
         </section>
       </div>

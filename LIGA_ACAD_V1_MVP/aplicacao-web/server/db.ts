@@ -3,9 +3,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
   financialEntries,
+  InsertSecurityEvent,
   InsertUser,
   propertyMembers,
   ruralProperties,
+  securityEvents,
   usuarioPropriedade,
   usuarios,
   userProfiles,
@@ -138,6 +140,11 @@ async function requireDb() {
   const db = await getDb();
   if (!db) throw new Error("A ligação ao banco de dados não está disponível.");
   return db;
+}
+
+export async function insertSecurityEvent(event: InsertSecurityEvent) {
+  const db = await requireDb();
+  await db.insert(securityEvents).values(event);
 }
 
 export async function getUserProfile(userId: number) {
