@@ -47,3 +47,24 @@ export function formatAxisDate(value: Date | string, granularity: "day" | "week"
   if (granularity === "month") return new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit" }).format(date);
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
 }
+
+/** "12,68%" — valores já em pontos percentuais (12.68 → 12,68%). */
+export function formatPercent(value: number | null | undefined, maximumFractionDigits = 2) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "percent",
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  }).format(value / 100);
+}
+
+/** "out/25" (curto, para eixos) ou "outubro de 2025" (longo) para meses AAAA-MM. */
+export function formatMonth(value: string, style: "short" | "long" = "long") {
+  const [year, month] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  if (style === "short") {
+    const name = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", month: "short" }).format(date).replace(".", "");
+    return `${name}/${String(year).slice(-2)}`;
+  }
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", month: "long", year: "numeric" }).format(date);
+}

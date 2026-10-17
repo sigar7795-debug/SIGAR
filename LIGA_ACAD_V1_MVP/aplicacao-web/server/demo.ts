@@ -1,6 +1,7 @@
 import { DEMO_LOGIN_METHOD } from "../shared/const.js";
 import type {
   FinancialEntry,
+  InvestmentAlternative,
   RuralProperty,
   User,
   UserProfile,
@@ -436,4 +437,101 @@ export function revokeDemoPropertyMember(propertyId: number, memberId: number) {
     member.updatedAt = new Date();
   }
   return getDemoPropertyMembers(propertyId);
+}
+
+// Taxas ilustrativas, apenas para a demonstração das simulações (RF26–RF31).
+export const demoInvestmentAlternatives: InvestmentAlternative[] = [
+  {
+    id: 1,
+    propertyId: 1,
+    createdById: demoOwnerId,
+    name: "Tesouro Selic",
+    description: "Exemplo de titulo publico pos-fixado com liquidez diaria.",
+    initialAmount: "100000.00",
+    monthlyContribution: "2000.00",
+    termMonths: 24,
+    returnRate: "12.0000",
+    ratePeriod: "anual",
+    adminFeeRate: "0.2000",
+    fixedCosts: "0.00",
+    incomeTaxRate: "17.50",
+    createdAt: previousMonthDate(10),
+    updatedAt: previousMonthDate(10),
+  },
+  {
+    id: 2,
+    propertyId: 1,
+    createdById: demoOwnerId,
+    name: "CDB de banco medio",
+    description: "Exemplo de CDB prefixado com vencimento em 2 anos.",
+    initialAmount: "100000.00",
+    monthlyContribution: "2000.00",
+    termMonths: 24,
+    returnRate: "13.5000",
+    ratePeriod: "anual",
+    adminFeeRate: "0.0000",
+    fixedCosts: "0.00",
+    incomeTaxRate: "17.50",
+    createdAt: previousMonthDate(9),
+    updatedAt: previousMonthDate(9),
+  },
+  {
+    id: 3,
+    propertyId: 1,
+    createdById: demoOwnerId,
+    name: "Poupanca",
+    description: "Exemplo de rendimento mensal isento de imposto.",
+    initialAmount: "100000.00",
+    monthlyContribution: "2000.00",
+    termMonths: 24,
+    returnRate: "0.5000",
+    ratePeriod: "mensal",
+    adminFeeRate: "0.0000",
+    fixedCosts: "0.00",
+    incomeTaxRate: "0.00",
+    createdAt: previousMonthDate(8),
+    updatedAt: previousMonthDate(8),
+  },
+];
+
+export function listDemoInvestmentAlternatives(propertyId: number) {
+  return demoInvestmentAlternatives
+    .filter(alternative => alternative.propertyId === propertyId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
+}
+
+export function createDemoInvestmentAlternative(
+  values: Omit<InvestmentAlternative, "id" | "createdAt" | "updatedAt">,
+) {
+  const nextId = Math.max(0, ...demoInvestmentAlternatives.map(alternative => alternative.id)) + 1;
+  const created: InvestmentAlternative = {
+    ...values,
+    id: nextId,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  demoInvestmentAlternatives.unshift(created);
+  return created;
+}
+
+export function updateDemoInvestmentAlternative(
+  propertyId: number,
+  alternativeId: number,
+  values: Partial<Omit<InvestmentAlternative, "id" | "propertyId" | "createdById" | "createdAt" | "updatedAt">>,
+) {
+  const alternative = demoInvestmentAlternatives.find(
+    item => item.id === alternativeId && item.propertyId === propertyId,
+  );
+  if (!alternative) return null;
+  Object.assign(alternative, values, { updatedAt: new Date() });
+  return alternative;
+}
+
+export function deleteDemoInvestmentAlternative(propertyId: number, alternativeId: number) {
+  const index = demoInvestmentAlternatives.findIndex(
+    item => item.id === alternativeId && item.propertyId === propertyId,
+  );
+  if (index < 0) return null;
+  demoInvestmentAlternatives.splice(index, 1);
+  return { id: alternativeId };
 }

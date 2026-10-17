@@ -10,9 +10,7 @@ import {
   deactivateProperty,
   declineInvite,
   deleteFinancialEntry,
-  type EffectiveRole,
   getActivePropertyById,
-  getEffectiveRole,
   getPropertyEntry,
   getUserProfile,
   listDomainUsersByCreator,
@@ -22,7 +20,6 @@ import {
   listPropertyEntries,
   listPropertyMembers,
   revokeMember,
-  roleMeets,
   saveUserProfile,
   updateFinancialEntry,
   updateMemberRole,
@@ -61,6 +58,8 @@ import {
   updateDemoProperty,
   updateDemoPropertyMemberRole,
 } from "../demo.js";
+import { investmentsRouter } from "./investments.js";
+import { assertPropertyAccess } from "./propertyAccess.js";
 
 const profileRoles = [
   "produtor",
@@ -219,21 +218,6 @@ export function canDeactivateProperty(
       profileRole as (typeof propertyRemovalRoles)[number]
     )
   );
-}
-
-async function assertPropertyAccess(
-  propertyId: number,
-  userId: number,
-  minRole: EffectiveRole
-) {
-  const role = await getEffectiveRole(propertyId, userId);
-  if (!roleMeets(role, minRole)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Não tem acesso a esta propriedade.",
-    });
-  }
-  return role as EffectiveRole;
 }
 
 async function assertEntryAccess(
@@ -747,4 +731,5 @@ export const financeRouter = router({
         return { id: declined.id, declined: true };
       }),
   }),
+  investments: investmentsRouter,
 });

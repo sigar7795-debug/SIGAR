@@ -15,7 +15,7 @@ import {
 import { useIsMobile } from "@/hooks/useMobile";
 import { useSelectedProperty } from "@/hooks/useSelectedProperty";
 import { trpc } from "@/lib/trpc";
-import { Calculator, CalendarDays, Landmark, LayoutDashboard, LogOut, PanelLeft, UserRound } from "lucide-react";
+import { Calculator, CalendarDays, Landmark, LayoutDashboard, LogOut, PanelLeft, TrendingUp, UserRound } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -26,6 +26,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Visão geral", path: "/dashboard" },
   { icon: Landmark, label: "Propriedades", path: "/propriedades" },
   { icon: Calculator, label: "Fluxo de caixa", path: "/fluxo-de-caixa" },
+  { icon: TrendingUp, label: "Investimentos", path: "/investimentos" },
   { icon: UserRound, label: "Meu perfil", path: "/perfil" },
 ];
 

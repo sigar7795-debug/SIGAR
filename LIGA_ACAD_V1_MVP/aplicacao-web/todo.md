@@ -64,3 +64,11 @@
 - [x] Registar eventos de segurança de senha na tabela `securityEvents` sem guardar senha, token ou e-mail em claro.
 - [x] Cobrir em testes os fluxos de redefinição, troca de senha e auditoria.
 - [ ] Aplicar a migração `20260925120000_security_events.sql` no Supabase e liberar `/redefinir-senha` nas Redirect URLs.
+- [x] Cadastrar alternativas de investimento com valor inicial, aportes, prazo, taxa de retorno e custos por propriedade (RF26, RF27).
+- [x] Calcular o retorno estimado de cada alternativa mês a mês, com taxa de administração, custos fixos e imposto sobre o rendimento (RF28).
+- [x] Calcular o custo de oportunidade do capital empregado na propriedade e o resultado econômico (RF29).
+- [x] Comparar a rentabilidade da atividade rural com as alternativas no mesmo período de meses inteiros (RF30, RN07).
+- [x] Apresentar simulações e comparação em tabelas e gráficos, com visão em tabela para cada gráfico (RF31).
+- [x] Documentar fórmulas, premissas e arredondamentos em `docs/investimentos-rf26-rf31.md` e na seção **Como calculamos** da página.
+- [x] Cobrir em testes cenários com taxas mensais e anuais, aportes, prazos distintos, custos, IR, permissões e o modo de demonstração.
+- [x] Aplicar a migração `20261016120000_investment_alternatives.sql` no Supabase.
