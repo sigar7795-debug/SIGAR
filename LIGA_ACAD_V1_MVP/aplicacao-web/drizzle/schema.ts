@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   decimal,
   index,
@@ -244,6 +246,72 @@ export const financialEntries = pgTable(
   ]
 );
 
+export const investmentRatePeriod = pgEnum("investment_rate_period", [
+  "mensal",
+  "anual",
+]);
+
+/**
+ * Alternativa de investimento financeiro simulada para uma propriedade
+ * (RF26–RF28). Valores em R$ com 2 casas; taxas em % (retorno ao mês ou ao
+ * ano, administração ao ano, IR sobre o rendimento). Os resultados não são
+ * gravados: são recalculados a cada consulta por `shared/investments.ts`.
+ */
+export const investmentAlternatives = pgTable(
+  "investmentAlternatives",
+  {
+    id: serial("id").primaryKey(),
+    propertyId: integer("propertyId")
+      .notNull()
+      .references(() => ruralProperties.id, { onDelete: "cascade" }),
+    createdById: integer("createdById")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    initialAmount: decimal("initialAmount", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    monthlyContribution: decimal("monthlyContribution", {
+      precision: 14,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    termMonths: integer("termMonths").notNull(),
+    returnRate: decimal("returnRate", { precision: 7, scale: 4 }).notNull(),
+    ratePeriod: investmentRatePeriod("ratePeriod").notNull().default("anual"),
+    adminFeeRate: decimal("adminFeeRate", { precision: 7, scale: 4 })
+      .notNull()
+      .default("0"),
+    fixedCosts: decimal("fixedCosts", { precision: 14, scale: 2 })
+      .notNull()
+      .default("0"),
+    incomeTaxRate: decimal("incomeTaxRate", { precision: 5, scale: 2 })
+      .notNull()
+      .default("0"),
+    createdAt,
+    updatedAt,
+  },
+  table => [
+    index("investment_alternatives_property_idx").on(table.propertyId),
+    index("investment_alternatives_creator_idx").on(table.createdById),
+    check(
+      "investment_alternatives_amounts_check",
+      sql`${table.initialAmount} >= 0 and ${table.monthlyContribution} >= 0 and ${table.fixedCosts} >= 0 and (${table.initialAmount} > 0 or ${table.monthlyContribution} > 0)`
+    ),
+    check(
+      "investment_alternatives_term_check",
+      sql`${table.termMonths} between 1 and 360`
+    ),
+    check(
+      "investment_alternatives_rates_check",
+      sql`${table.returnRate} between 0 and 100 and ${table.adminFeeRate} between 0 and 100 and ${table.incomeTaxRate} between 0 and 100`
+    ),
+  ]
+);
+
 export const securityEventType = pgEnum("security_event_type", [
   "password_reset_requested",
   "password_reset_completed",
@@ -285,5 +353,6 @@ export type UsuarioPropriedade = typeof usuarioPropriedade.$inferSelect;
 export type PropertyMember = typeof propertyMembers.$inferSelect;
 export type RuralProperty = typeof ruralProperties.$inferSelect;
 export type FinancialEntry = typeof financialEntries.$inferSelect;
+export type InvestmentAlternative = typeof investmentAlternatives.$inferSelect;
 export type SecurityEventType = (typeof securityEventType.enumValues)[number];
 export type InsertSecurityEvent = typeof securityEvents.$inferInsert;

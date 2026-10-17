@@ -5,6 +5,7 @@ import {
   financialEntries,
   InsertSecurityEvent,
   InsertUser,
+  investmentAlternatives,
   propertyMembers,
   ruralProperties,
   securityEvents,
@@ -748,4 +749,71 @@ export async function updateFinancialEntry(
 export async function deleteFinancialEntry(entryId: number) {
   const db = await requireDb();
   await db.delete(financialEntries).where(eq(financialEntries.id, entryId));
+}
+
+export type InvestmentAlternativeValues = Omit<
+  typeof investmentAlternatives.$inferInsert,
+  "id" | "propertyId" | "createdById" | "createdAt" | "updatedAt"
+>;
+
+export async function listInvestmentAlternatives(propertyId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(investmentAlternatives)
+    .where(eq(investmentAlternatives.propertyId, propertyId))
+    .orderBy(
+      desc(investmentAlternatives.createdAt),
+      desc(investmentAlternatives.id)
+    );
+}
+
+export async function createInvestmentAlternative(
+  values: InvestmentAlternativeValues & {
+    propertyId: number;
+    createdById: number;
+  }
+) {
+  const db = await requireDb();
+  const [created] = await db
+    .insert(investmentAlternatives)
+    .values(values)
+    .returning();
+  return created ?? null;
+}
+
+export async function updateInvestmentAlternative(
+  alternativeId: number,
+  propertyId: number,
+  values: InvestmentAlternativeValues
+) {
+  const db = await requireDb();
+  const [updated] = await db
+    .update(investmentAlternatives)
+    .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(
+        eq(investmentAlternatives.id, alternativeId),
+        eq(investmentAlternatives.propertyId, propertyId)
+      )
+    )
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteInvestmentAlternative(
+  alternativeId: number,
+  propertyId: number
+) {
+  const db = await requireDb();
+  const [deleted] = await db
+    .delete(investmentAlternatives)
+    .where(
+      and(
+        eq(investmentAlternatives.id, alternativeId),
+        eq(investmentAlternatives.propertyId, propertyId)
+      )
+    )
+    .returning({ id: investmentAlternatives.id });
+  return deleted ?? null;
 }

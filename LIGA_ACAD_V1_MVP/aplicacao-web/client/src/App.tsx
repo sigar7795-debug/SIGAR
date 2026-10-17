@@ -10,6 +10,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import CashFlowPage from "./pages/CashFlowPage";
 import DashboardPage from "./pages/DashboardPage";
 import Home from "./pages/Home";
+import InvestmentsPage from "./pages/InvestmentsPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import PropertiesPage from "./pages/PropertiesPage";
@@ -27,6 +28,10 @@ function CashFlowRoute() {
   return <DashboardLayout><CashFlowPage /></DashboardLayout>;
 }
 
+function InvestmentsRoute() {
+  return <DashboardLayout><InvestmentsPage /></DashboardLayout>;
+}
+
 function ProfileRoute() {
   return <DashboardLayout><ProfilePage /></DashboardLayout>;
 }
@@ -41,6 +46,7 @@ function Router() {
       <Route path={"/dashboard"} component={DashboardRoute} />
       <Route path={"/propriedades"} component={PropertiesRoute} />
       <Route path={"/fluxo-de-caixa"} component={CashFlowRoute} />
+      <Route path={"/investimentos"} component={InvestmentsRoute} />
       <Route path={"/perfil"} component={ProfileRoute} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
