@@ -182,7 +182,8 @@ export function AudiencesSection() {
   };
 
   const showCursorPreview = (index: number, event: ReactPointerEvent<HTMLButtonElement>) => {
-    setActiveIndex(index);
+    setActiveIndex(index)
+    return;
     if (!hoverCapable || reduceMotion || event.pointerType === "touch") return;
 
     updateCursorDotPosition(event.clientX, event.clientY);
