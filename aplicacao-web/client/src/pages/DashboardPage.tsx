@@ -213,7 +213,7 @@ export default function DashboardPage() {
                         <span className={`grid h-8 w-8 place-items-center border ${receipt ? "border-positive/30 text-positive" : "border-warning/30 text-warning"}`}>
                           {receipt ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                         </span>
-                        <span className="min-w-0"><span className="block truncate text-sm font-semibold">{entry.description}</span><span className="mt-1 block text-xs text-graphite/50">{formatDate(entry.occurredOn)} · {entry.category}</span></span>
+                        <span className="min-w-0"><span className="block truncate text-sm font-semibold">{entry.description || entry.category}</span><span className="mt-1 block text-xs text-graphite/50">{formatDate(entry.occurredOn)} · {entry.category}</span></span>
                         <span className={`whitespace-nowrap text-sm font-bold tabular-nums ${receipt ? "text-positive" : "text-graphite"}`}>{receipt ? "+" : "−"} {formatCurrency(entry.amount)}</span>
                       </div>
                     );

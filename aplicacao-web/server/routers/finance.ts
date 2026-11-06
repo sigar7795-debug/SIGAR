@@ -181,7 +181,7 @@ const entryDetailsInput = z.object({
   entryType: z.enum(financialEntryTypes),
   category: z.string().trim().min(2).max(100),
   activity: z.string().trim().min(2).max(120),
-  description: z.string().trim().min(3).max(1200),
+  description: z.string().trim().max(1200).default(""),
   occurredOn: isoDate,
   dueOn: isoDate.optional(),
   settlementStatus: z.enum(financialSettlementStatuses).default("liquidado"),
