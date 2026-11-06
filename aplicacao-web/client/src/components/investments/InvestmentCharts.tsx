@@ -176,6 +176,10 @@ export function InvestmentGrowthChart({
   const [showTable, tableToggle] = useTableToggle();
   const lastMonth = timeline[timeline.length - 1]?.month ?? 0;
   const final = timeline[timeline.length - 1];
+  // "Valor aplicado" soma o valor inicial e os aportes; a coluna de aportes
+  // isola só os aportes mensais acumulados e aparece apenas quando existem.
+  const initialAmount = timeline[0]?.contributed ?? 0;
+  const hasContributions = (final?.contributed ?? 0) > initialAmount;
   const tableRows = timeline.filter(
     point =>
       point.month > 0 &&
@@ -195,6 +199,9 @@ export function InvestmentGrowthChart({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead>Mês</TableHead>
+                {hasContributions ? (
+                  <TableHead className="text-right">Aportes acumulados</TableHead>
+                ) : null}
                 <TableHead className="text-right">Valor aplicado</TableHead>
                 <TableHead className="text-right">Rendimento bruto</TableHead>
                 <TableHead className="text-right">Taxa de adm.</TableHead>
@@ -208,6 +215,11 @@ export function InvestmentGrowthChart({
                   <TableCell className="whitespace-nowrap font-medium">
                     {point.month}º mês
                   </TableCell>
+                  {hasContributions ? (
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(point.contributed - initialAmount)}
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-right tabular-nums">
                     {formatCurrency(point.contributed)}
                   </TableCell>
