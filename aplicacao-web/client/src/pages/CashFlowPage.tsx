@@ -1,4 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { EmptyState } from "@/components/EmptyState";
 import { FinancialTrendChart } from "@/components/FinancialTrendChart";
 import { LoadingState, QueryErrorState } from "@/components/DataFeedback";
@@ -16,7 +15,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSelectedProperty } from "@/hooks/useSelectedProperty";
 import { formatCurrency, formatDate, formatPeriod } from "@/lib/formatters";
 import { trpc } from "@/lib/trpc";
-import { DEMO_LOGIN_METHOD } from "@shared/const";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleDollarSign, Landmark, Pencil, Plus, ReceiptText, Search, SearchX, Trash2 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -37,15 +35,6 @@ const entryTypes = [
   { value: "despesa_administrativa", label: "Despesa administrativa", direction: "saída" },
   { value: "imposto", label: "Imposto ou taxa", direction: "saída" },
   { value: "deducao", label: "Dedução", direction: "saída" },
-] as const;
-
-// Ambiente de demonstração: o formulário oferece apenas Receita ou Despesa.
-// "Despesa" é gravada como custo variável para continuar a entrar nos custos totais,
-// no lucro e na margem de contribuição.
-const DEMO_EXPENSE_TYPE = "custo_variavel";
-const demoEntryTypes = [
-  { value: "receita", label: "Receita" },
-  { value: "despesa", label: "Despesa" },
 ] as const;
 
 const settlementOptions = [
@@ -85,8 +74,6 @@ function toInputDate(value: Date | string | null) {
 export default function CashFlowPage() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
-  const { user } = useAuth();
-  const isDemo = user?.loginMethod === DEMO_LOGIN_METHOD;
   const { propertyId, setPropertyId } = useSelectedProperty();
   const [range, setRange] = useState<(typeof ranges)[number]["value"]>("mes");
   const [referenceDate, setReferenceDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -259,7 +246,7 @@ export default function CashFlowPage() {
         </>
       )}
 
-      <EntryDialog open={open} onOpenChange={next => { if (next) setOpen(true); else closeDialog(); }} form={form} setForm={setForm} onSubmit={submit} loading={isMutating} editing={Boolean(editingEntryId)} simplified={isDemo} />
+      <EntryDialog open={open} onOpenChange={next => { if (next) setOpen(true); else closeDialog(); }} form={form} setForm={setForm} onSubmit={submit} loading={isMutating} editing={Boolean(editingEntryId)} />
     </div>
   );
 }
@@ -273,17 +260,9 @@ function DeleteEntryDialog({ description, onConfirm, loading }: { description: s
   return <AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="outline" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /><span className="sr-only">Excluir lançamento</span></Button></AlertDialogTrigger><AlertDialogContent className="sm:max-w-md"><AlertDialogHeader><AlertDialogTitle className="font-display text-xl font-extrabold text-foreground">Excluir lançamento?</AlertDialogTitle><AlertDialogDescription className="leading-6">"{description}" será removido e os indicadores do período serão recalculados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={onConfirm} disabled={loading} className="bg-destructive font-bold text-white hover:bg-destructive/90">{loading ? "A excluir..." : "Excluir lançamento"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 }
 
-function EntryDialog({ open, onOpenChange, form, setForm, onSubmit, loading, editing, simplified = false }: { open: boolean; onOpenChange: (open: boolean) => void; form: EntryForm; setForm: (form: EntryForm) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; loading: boolean; editing: boolean; simplified?: boolean }) {
+function EntryDialog({ open, onOpenChange, form, setForm, onSubmit, loading, editing }: { open: boolean; onOpenChange: (open: boolean) => void; form: EntryForm; setForm: (form: EntryForm) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; loading: boolean; editing: boolean }) {
   const update = (key: keyof EntryForm, value: string) => setForm({ ...form, [key]: value });
-  const simplifiedType = form.entryType === "receita" ? "receita" : "despesa";
-  // Ao editar uma despesa existente, mantém o tipo original (ex.: custo fixo) em vez de o reclassificar.
-  const updateSimplifiedType = (value: string) => {
-    if (value === "receita") update("entryType", "receita");
-    else if (form.entryType === "receita") update("entryType", DEMO_EXPENSE_TYPE);
-  };
-  const typeSelect = simplified
-    ? <Select value={simplifiedType} onValueChange={updateSimplifiedType}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent>{demoEntryTypes.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-    : <Select value={form.entryType} onValueChange={value => update("entryType", value)}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent>{entryTypes.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>;
+  const typeSelect = <Select value={form.entryType} onValueChange={value => update("entryType", value)}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent>{entryTypes.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>;
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-2xl"><form onSubmit={onSubmit}><DialogHeader className="border-b border-border px-6 py-6"><div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-foreground"><ReceiptText className="h-5 w-5" /></div><DialogTitle className="font-display text-2xl font-extrabold tracking-[-0.04em] text-foreground">{editing ? "Editar lançamento" : "Novo lançamento"}</DialogTitle><DialogDescription className="leading-6">Classifique a atividade e a situação para separar resultado económico, saldo disponível e pendências.</DialogDescription></DialogHeader><div className="grid gap-5 px-6 py-6 sm:grid-cols-2"><EntryField label="Tipo" required>{typeSelect}</EntryField><EntryField label="Situação" required><Select value={form.settlementStatus} onValueChange={value => update("settlementStatus", value)}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent>{settlementOptions.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></EntryField><EntryField label="Data de competência" required><Input required type="date" value={form.occurredOn} onChange={event => update("occurredOn", event.target.value)} className="h-11" /></EntryField>{form.settlementStatus === "pendente" ? <EntryField label="Vencimento"><Input type="date" value={form.dueOn} onChange={event => update("dueOn", event.target.value)} className="h-11" /></EntryField> : null}<EntryField label="Categoria" required><Input required value={form.category} onChange={event => update("category", event.target.value)} placeholder="Ex.: Venda de gado" className="h-11" /></EntryField><EntryField label="Atividade produtiva" required><Input required value={form.activity} onChange={event => update("activity", event.target.value)} placeholder="Ex.: Pecuária de corte" className="h-11" /></EntryField><EntryField label="Valor (R$)" required><Input required type="number" min="0.01" step="0.01" value={form.amount} onChange={event => update("amount", event.target.value)} placeholder="0,00" className="h-11 tabular-nums" /></EntryField><EntryField label="Descrição" className="sm:col-span-2"><Input value={form.description} onChange={event => update("description", event.target.value)} placeholder="Descreva brevemente a movimentação" className="h-11" /></EntryField></div><DialogFooter className="border-t border-border px-6 py-5"><Button type="submit" disabled={loading} className="bg-primary font-bold text-primary-foreground hover:bg-primary/90">{loading ? "A guardar..." : editing ? "Guardar alterações" : "Registar lançamento"}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
