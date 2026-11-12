@@ -12,7 +12,6 @@ import { SignJWT, jwtVerify } from "jose";
 import { randomBytes } from "node:crypto";
 import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
-import { buildDemoUser, isDemoOpenId } from "../demo.js";
 import { ENV } from "./env.js";
 import type {
   ExchangeTokenRequest,
@@ -289,10 +288,6 @@ class SDKServer {
         throw ForbiddenError("Cron session missing task_uid");
       }
       return buildCronUser(userInfo);
-    }
-
-    if (isDemoOpenId(session.openId)) {
-      return buildDemoUser(session.openId, session.name);
     }
 
     const sessionUserId = session.openId;
