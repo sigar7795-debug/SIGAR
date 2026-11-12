@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
-import { DEMO_LOGIN_METHOD } from "@shared/const";
 import { getNewPasswordError, getPasswordConfirmationError, PASSWORD_MIN_LENGTH, SAME_PASSWORD_ERROR } from "@shared/passwordPolicy";
 import { Bell, BriefcaseBusiness, Building2, GraduationCap, LockKeyhole, Pencil, Phone, Save, Sprout, UserCog, UsersRound } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
@@ -133,12 +132,12 @@ export default function ProfilePage() {
         </Button>
       </div>
 
-      <PasswordChangeSection isDemo={user?.loginMethod === DEMO_LOGIN_METHOD} />
+      <PasswordChangeSection />
     </div>
   );
 }
 
-function PasswordChangeSection({ isDemo }: { isDemo: boolean }) {
+function PasswordChangeSection() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -171,10 +170,7 @@ function PasswordChangeSection({ isDemo }: { isDemo: boolean }) {
   return (
     <section className="border-t border-olive/35 pt-6">
       <div className="flex items-center gap-3"><LockKeyhole className="h-5 w-5 text-olive" /><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">Segurança</p><h2 className="mt-1 font-display text-2xl font-bold">Alteração de senha</h2></div></div>
-      {isDemo ? (
-        <p className="mt-6 border-l-2 border-olive/40 bg-card px-5 py-4 text-sm text-graphite/70">A conta de demonstração não possui senha. Crie uma conta para definir e alterar a sua senha.</p>
-      ) : (
-        <form onSubmit={submit} noValidate>
+      <form onSubmit={submit} noValidate>
           <p className="mt-3 text-sm text-graphite/60">Confirme a senha atual e escolha uma nova com pelo menos {PASSWORD_MIN_LENGTH} caracteres.</p>
           <div className="mt-6 grid gap-5 sm:grid-cols-3">
             <PasswordField id="current-password" label="Senha atual" autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} error={errors.current} />
@@ -188,7 +184,6 @@ function PasswordChangeSection({ isDemo }: { isDemo: boolean }) {
             </Button>
           </div>
         </form>
-      )}
     </section>
   );
 }

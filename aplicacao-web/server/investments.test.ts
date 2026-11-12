@@ -20,7 +20,6 @@ const database = vi.hoisted(() => ({
 
 vi.mock("./db", () => database);
 
-import { createDemoOpenId } from "./demo";
 import { appRouter } from "./routers";
 
 function createContext(openId = "user-42"): TrpcContext {
@@ -385,41 +384,5 @@ describe("investimentos: comparação com a atividade rural (RF29, RF30, RN07)",
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     }
     expect(database.listPropertyEntries).not.toHaveBeenCalled();
-  });
-});
-
-describe("investimentos: modo de demonstração", () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it("lista, cadastra, compara e exclui sem tocar no banco", async () => {
-    const caller = appRouter.createCaller(
-      createContext(createDemoOpenId("demonstracao@sigar.local"))
-    );
-
-    const initial = await caller.finance.investments.list({ propertyId: 1 });
-    expect(initial.length).toBeGreaterThan(0);
-    expect(initial.every(item => item.simulation.netReturn > 0)).toBe(true);
-
-    const created = await caller.finance.investments.create({
-      ...validAlternative,
-      propertyId: 1,
-    });
-    const comparison = await caller.finance.investments.compare({
-      propertyId: 1,
-      startMonth: "2026-01",
-      endMonth: "2026-12",
-      capital: 500000,
-    });
-    expect(comparison.alternatives).toHaveLength(initial.length + 1);
-
-    await caller.finance.investments.delete({
-      propertyId: 1,
-      alternativeId: created.id,
-    });
-    await expect(
-      caller.finance.investments.list({ propertyId: 1 })
-    ).resolves.toHaveLength(initial.length);
-    expect(database.getEffectiveRole).not.toHaveBeenCalled();
-    expect(database.createInvestmentAlternative).not.toHaveBeenCalled();
   });
 });

@@ -195,8 +195,7 @@ Seguem os papéis de [membros da propriedade](membros-propriedade.md):
 Edição e exclusão só alcançam alternativas da propriedade informada; outra
 alternativa responde `NOT_FOUND`. A verificação de papel (`assertPropertyAccess`)
 passou para `server/routers/propertyAccess.ts` e é partilhada com o
-`financeRouter`. No modo de demonstração, as alternativas ficam em memória
-(`server/demo.ts`), com taxas ilustrativas.
+`financeRouter`.
 
 ## API (tRPC)
 
@@ -221,7 +220,7 @@ passou para `server/routers/propertyAccess.ts` e é partilhada com o
   visualizador só consulta, conversão para decimal ao gravar, rejeição de
   valores fora dos limites, edição e exclusão restritas à propriedade, janela
   de datas usada na consulta dos lançamentos, filtro por atividade, validação
-  do período e do capital, e o modo de demonstração sem acesso ao banco.
+  do período e do capital.
 
 ## Validação visual
 
@@ -237,5 +236,4 @@ horizontal, como no fluxo de caixa.
 Aplicar no Supabase a migração
 `supabase/migrations/20261016120000_investment_alternatives.sql` (espelhada em
 `drizzle/0007_investment_alternatives.sql`). Sem ela, a página mostra erro ao
-carregar as alternativas e a comparação; o modo de demonstração não depende
-dela.
+carregar as alternativas e a comparação.

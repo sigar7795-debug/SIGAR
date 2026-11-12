@@ -20,7 +20,6 @@ vi.mock("./supabaseAuth", async importOriginal => ({
 }));
 vi.mock("./db", () => database);
 
-import { createDemoOpenId } from "./demo";
 import { appRouter } from "./routers";
 import { PasswordFlowError } from "./supabaseAuth";
 
@@ -332,25 +331,6 @@ describe("auth.changePassword", () => {
     expect(error.message).toBe(
       "A nova senha deve ser diferente da senha atual."
     );
-    expect(provider.changePasswordWithSupabase).not.toHaveBeenCalled();
-  });
-
-  it("does not offer password changes to the demo account", async () => {
-    const demoUser: AuthenticatedUser = {
-      ...accountUser,
-      id: -1,
-      openId: createDemoOpenId("demonstracao@sigar.local"),
-      loginMethod: "demonstracao",
-    };
-
-    const error = await rejectionOf(
-      createCaller(demoUser).auth.changePassword({
-        currentPassword: CURRENT_PASSWORD,
-        newPassword: NEW_PASSWORD,
-      })
-    );
-
-    expect(error.code).toBe("FORBIDDEN");
     expect(provider.changePasswordWithSupabase).not.toHaveBeenCalled();
   });
 });

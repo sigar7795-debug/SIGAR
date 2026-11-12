@@ -25,14 +25,6 @@ import {
   roundHalfAwayFromZero,
   summarizeInvestment,
 } from "../../shared/investments.js";
-import {
-  createDemoInvestmentAlternative,
-  deleteDemoInvestmentAlternative,
-  isDemoOpenId,
-  listDemoEntries,
-  listDemoInvestmentAlternatives,
-  updateDemoInvestmentAlternative,
-} from "../demo.js";
 import { assertPropertyAccess } from "./propertyAccess.js";
 
 const propertyIdInput = z.number().int().positive();
@@ -138,12 +130,6 @@ async function loadComparisonData(
   propertyId: number,
   period: MonthWindow
 ) {
-  if (isDemoOpenId(user.openId)) {
-    return {
-      entries: listDemoEntries(propertyId, period.startDate, period.endDate),
-      alternatives: listDemoInvestmentAlternatives(propertyId),
-    };
-  }
   await assertPropertyAccess(propertyId, user.id, "visualizador");
   const [entries, alternatives] = await Promise.all([
     listPropertyEntries(propertyId, period.startDate, period.endDate),
@@ -156,11 +142,6 @@ export const investmentsRouter = router({
   list: protectedProcedure
     .input(z.object({ propertyId: propertyIdInput }))
     .query(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return listDemoInvestmentAlternatives(input.propertyId).map(
-          withSimulation
-        );
-      }
       await assertPropertyAccess(input.propertyId, ctx.user.id, "visualizador");
       const alternatives = await listInvestmentAlternatives(input.propertyId);
       return alternatives.map(withSimulation);
@@ -173,9 +154,6 @@ export const investmentsRouter = router({
         createdById: ctx.user.id,
         ...alternativeValues(input),
       };
-      if (isDemoOpenId(ctx.user.openId)) {
-        return withSimulation(createDemoInvestmentAlternative(values));
-      }
       await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
       const created = await createInvestmentAlternative(values);
       if (!created) {
@@ -190,15 +168,6 @@ export const investmentsRouter = router({
     .input(alternativeUpdateInput)
     .mutation(async ({ ctx, input }) => {
       const values = alternativeValues(input);
-      if (isDemoOpenId(ctx.user.openId)) {
-        const updated = updateDemoInvestmentAlternative(
-          input.propertyId,
-          input.alternativeId,
-          values
-        );
-        if (!updated) throw alternativeNotFound();
-        return withSimulation(updated);
-      }
       await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
       const updated = await updateInvestmentAlternative(
         input.alternativeId,
@@ -216,17 +185,6 @@ export const investmentsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        if (
-          !deleteDemoInvestmentAlternative(
-            input.propertyId,
-            input.alternativeId
-          )
-        ) {
-          throw alternativeNotFound();
-        }
-        return { id: input.alternativeId, deleted: true as const };
-      }
       await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
       const deleted = await deleteInvestmentAlternative(
         input.alternativeId,

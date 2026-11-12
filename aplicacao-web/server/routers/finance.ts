@@ -37,27 +37,6 @@ import {
   getPeriodWindow,
   getPreviousPeriodWindow,
 } from "../../shared/financial.js";
-import {
-  createDemoDomainUser,
-  createDemoFinancialEntry,
-  createDemoProperty,
-  deactivateDemoProperty,
-  deleteDemoFinancialEntry,
-  demoDomainUsers,
-  demoProfile,
-  demoProperties,
-  getDemoPropertyMembers,
-  getDemoPropertyUsers,
-  inviteDemoPropertyMember,
-  isDemoOpenId,
-  linkDemoPropertyUsers,
-  listDemoEntries,
-  revokeDemoPropertyMember,
-  saveDemoProfile,
-  updateDemoFinancialEntry,
-  updateDemoProperty,
-  updateDemoPropertyMemberRole,
-} from "../demo.js";
 import { investmentsRouter } from "./investments.js";
 import { assertPropertyAccess } from "./propertyAccess.js";
 
@@ -293,22 +272,16 @@ function entryValues(input: z.infer<typeof entryDetailsInput>) {
 
 export const financeRouter = router({
   profile: router({
-    get: protectedProcedure.query(({ ctx }) =>
-      isDemoOpenId(ctx.user.openId) ? demoProfile : getUserProfile(ctx.user.id)
-    ),
+    get: protectedProcedure.query(({ ctx }) => getUserProfile(ctx.user.id)),
     save: protectedProcedure
       .input(z.object({ profileRole: z.enum(profileRoles) }))
       .mutation(({ ctx, input }) =>
-        isDemoOpenId(ctx.user.openId)
-          ? saveDemoProfile(input.profileRole)
-          : saveUserProfile(ctx.user.id, input.profileRole)
+        saveUserProfile(ctx.user.id, input.profileRole)
       ),
   }),
   domainUsers: router({
     list: protectedProcedure.query(({ ctx }) =>
-      isDemoOpenId(ctx.user.openId)
-        ? demoDomainUsers
-        : listDomainUsersByCreator(ctx.user.id)
+      listDomainUsersByCreator(ctx.user.id)
     ),
     create: protectedProcedure
       .input(
@@ -319,9 +292,6 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return createDemoDomainUser(input);
-        }
         try {
           return await createDomainUser({
             cpf: input.cpf,
@@ -342,15 +312,6 @@ export const financeRouter = router({
   }),
   properties: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      if (isDemoOpenId(ctx.user.openId)) {
-        return demoProperties
-          .filter(property => property.isActive)
-          .map(property => ({
-            ...property,
-            domainUsers: getDemoPropertyUsers(property.id),
-            effectiveRole: "proprietario" as const,
-          }));
-      }
       const properties = await listPropertiesForUser(ctx.user.id);
       return Promise.all(
         properties.map(async property => ({
@@ -362,9 +323,6 @@ export const financeRouter = router({
     create: protectedProcedure
       .input(propertyInput)
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return createDemoProperty(input);
-        }
         try {
           return await createPropertyWithUsers(
             ctx.user.id,
@@ -400,18 +358,12 @@ export const financeRouter = router({
           mainActivity: input.mainActivity || null,
           description: input.description || null,
         };
-        if (isDemoOpenId(ctx.user.openId)) {
-          return updateDemoProperty(input.propertyId, values);
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
         return updateProperty(input.propertyId, values);
       }),
     users: protectedProcedure
       .input(z.object({ propertyId: z.number().int().positive() }))
       .query(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return getDemoPropertyUsers(input.propertyId);
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "visualizador");
         return listPropertyDomainUsers(input.propertyId);
       }),
@@ -427,9 +379,6 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return linkDemoPropertyUsers(input.propertyId, input.userCpfs);
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
         try {
           return await addUsersToProperty(
@@ -450,9 +399,6 @@ export const financeRouter = router({
     deactivate: protectedProcedure
       .input(z.object({ propertyId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return deactivateDemoProperty(input.propertyId);
-        }
         const property = await assertPropertyRemovalPermission(
           input.propertyId,
           ctx.user.id,
@@ -467,20 +413,12 @@ export const financeRouter = router({
       .input(dateRangeInput)
       .query(async ({ ctx, input }) => {
         const period = resolvePeriod(input);
-        const entries = isDemoOpenId(ctx.user.openId)
-          ? listDemoEntries(input.propertyId, period.startDate, period.endDate)
-          : await (async () => {
-              await assertPropertyAccess(
-                input.propertyId,
-                ctx.user.id,
-                "visualizador"
-              );
-              return listPropertyEntries(
-                input.propertyId,
-                period.startDate,
-                period.endDate
-              );
-            })();
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "visualizador");
+        const entries = await listPropertyEntries(
+          input.propertyId,
+          period.startDate,
+          period.endDate
+        );
         const filteredEntries = applyEntryFilters(entries, input);
         return {
           entries: filteredEntries,
@@ -496,13 +434,6 @@ export const financeRouter = router({
     create: protectedProcedure
       .input(entryCreateInput)
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return createDemoFinancialEntry({
-            propertyId: input.propertyId,
-            createdById: ctx.user.id,
-            ...entryValues(input),
-          });
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
         return createFinancialEntry({
           propertyId: input.propertyId,
@@ -513,9 +444,6 @@ export const financeRouter = router({
     update: protectedProcedure
       .input(entryUpdateInput)
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return updateDemoFinancialEntry(input.entryId, entryValues(input));
-        }
         await assertEntryAccess(input.entryId, input.propertyId, ctx.user.id);
         return updateFinancialEntry(input.entryId, entryValues(input));
       }),
@@ -527,9 +455,6 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return deleteDemoFinancialEntry(input.entryId);
-        }
         await assertEntryAccess(input.entryId, input.propertyId, ctx.user.id);
         await deleteFinancialEntry(input.entryId);
         return { id: input.entryId, deleted: true };
@@ -544,38 +469,15 @@ export const financeRouter = router({
           input.range,
           input.referenceDate
         );
-        const [entries, previousEntries] = isDemoOpenId(ctx.user.openId)
-          ? [
-              listDemoEntries(
-                input.propertyId,
-                period.startDate,
-                period.endDate
-              ),
-              listDemoEntries(
-                input.propertyId,
-                previousPeriod.startDate,
-                previousPeriod.endDate
-              ),
-            ]
-          : await (async () => {
-              await assertPropertyAccess(
-                input.propertyId,
-                ctx.user.id,
-                "visualizador"
-              );
-              return Promise.all([
-                listPropertyEntries(
-                  input.propertyId,
-                  period.startDate,
-                  period.endDate
-                ),
-                listPropertyEntries(
-                  input.propertyId,
-                  previousPeriod.startDate,
-                  previousPeriod.endDate
-                ),
-              ]);
-            })();
+        await assertPropertyAccess(input.propertyId, ctx.user.id, "visualizador");
+        const [entries, previousEntries] = await Promise.all([
+          listPropertyEntries(input.propertyId, period.startDate, period.endDate),
+          listPropertyEntries(
+            input.propertyId,
+            previousPeriod.startDate,
+            previousPeriod.endDate
+          ),
+        ]);
         const filteredEntries = applyEntryFilters(entries, input);
         const filteredPreviousEntries = applyEntryFilters(
           previousEntries,
@@ -597,9 +499,6 @@ export const financeRouter = router({
     list: protectedProcedure
       .input(z.object({ propertyId: z.number().int().positive() }))
       .query(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return getDemoPropertyMembers(input.propertyId);
-        }
         await assertPropertyAccess(
           input.propertyId,
           ctx.user.id,
@@ -616,13 +515,6 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return inviteDemoPropertyMember(
-            input.propertyId,
-            input.email,
-            input.role
-          );
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
         return createOrRefreshInvite(
           input.propertyId,
@@ -640,13 +532,6 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return updateDemoPropertyMemberRole(
-            input.propertyId,
-            input.memberId,
-            input.role
-          );
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
         const updated = await updateMemberRole(
           input.propertyId,
@@ -669,9 +554,6 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId)) {
-          return revokeDemoPropertyMember(input.propertyId, input.memberId);
-        }
         await assertPropertyAccess(input.propertyId, ctx.user.id, "proprietario");
         const revoked = await revokeMember(input.propertyId, input.memberId);
         if (!revoked) {
@@ -683,16 +565,16 @@ export const financeRouter = router({
         return listPropertyMembers(input.propertyId);
       }),
     pendingInvites: protectedProcedure.query(async ({ ctx }) => {
-      if (isDemoOpenId(ctx.user.openId) || !ctx.user.email) return [];
+      if (!ctx.user.email) return [];
       return listPendingInvitesForEmail(ctx.user.email.toLowerCase());
     }),
     acceptInvite: protectedProcedure
       .input(z.object({ memberId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId) || !ctx.user.email) {
+        if (!ctx.user.email) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Convites não estão disponíveis no modo de demonstração.",
+            message: "Esta conta não possui e-mail para responder convites.",
           });
         }
         const accepted = await acceptInvite(
@@ -711,10 +593,10 @@ export const financeRouter = router({
     declineInvite: protectedProcedure
       .input(z.object({ memberId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        if (isDemoOpenId(ctx.user.openId) || !ctx.user.email) {
+        if (!ctx.user.email) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Convites não estão disponíveis no modo de demonstração.",
+            message: "Esta conta não possui e-mail para responder convites.",
           });
         }
         const declined = await declineInvite(

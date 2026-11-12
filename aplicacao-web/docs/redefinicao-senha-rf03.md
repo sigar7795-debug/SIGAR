@@ -45,8 +45,7 @@ para `/redefinir-senha`.
 
 Exige sessão autenticada. O servidor confirma a senha atual com
 `signInWithPassword`, atualiza com `updateUser` e descarta a sessão
-temporária. A conta de demonstração não tem senha e recebe `FORBIDDEN`; a
-interface mostra um aviso no lugar do formulário.
+temporária.
 
 ## Política de senha
 
@@ -102,6 +101,6 @@ aviso no log do servidor com apenas `eventType` e `reason`.
   o token expirado, de login ou malformado, a revogação após a redefinição,
   a senha atual errada e a tradução de erros.
 - `server/auth.password.test.ts`: rotas tRPC. Cobre a resposta idêntica com
-  e sem conta, o link para `/redefinir-senha`, a autenticação obrigatória, a
-  conta de demonstração, as mensagens claras e a ausência de senha, token ou
+  e sem conta, o link para `/redefinir-senha`, a autenticação obrigatória, as
+  mensagens claras e a ausência de senha, token ou
   e-mail em claro nos eventos gravados.
