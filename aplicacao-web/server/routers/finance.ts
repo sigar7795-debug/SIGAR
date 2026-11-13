@@ -37,16 +37,17 @@ import {
   getPeriodWindow,
   getPreviousPeriodWindow,
 } from "../../shared/financial.js";
+import {
+  diffModuleOverrides,
+  moduleIds,
+  profileRoles,
+} from "../../shared/modules.js";
 import { investmentsRouter } from "./investments.js";
+import { moduleProcedure } from "./moduleAccess.js";
 import { assertPropertyAccess } from "./propertyAccess.js";
 
-const profileRoles = [
-  "produtor",
-  "gestor",
-  "estudante",
-  "consultor",
-  "administrador",
-] as const;
+const cashFlowProcedure = moduleProcedure("fluxo_caixa");
+
 const periodRanges = ["dia", "mes", "trimestre", "ano"] as const;
 const propertyRemovalRoles = ["gestor", "administrador"] as const;
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -274,9 +275,23 @@ export const financeRouter = router({
   profile: router({
     get: protectedProcedure.query(({ ctx }) => getUserProfile(ctx.user.id)),
     save: protectedProcedure
-      .input(z.object({ profileRole: z.enum(profileRoles) }))
+      .input(
+        z.object({
+          profileRole: z.enum(profileRoles),
+          // Lista completa de módulos ligados; omitir preserva os ajustes atuais.
+          enabledModules: z
+            .array(z.enum(moduleIds))
+            .max(moduleIds.length)
+            .optional(),
+        })
+      )
       .mutation(({ ctx, input }) =>
-        saveUserProfile(ctx.user.id, input.profileRole)
+        saveUserProfile(
+          ctx.user.id,
+          input.profileRole,
+          input.enabledModules &&
+            diffModuleOverrides(input.profileRole, input.enabledModules)
+        )
       ),
   }),
   domainUsers: router({
@@ -431,7 +446,7 @@ export const financeRouter = router({
           ).sort(),
         };
       }),
-    create: protectedProcedure
+    create: cashFlowProcedure
       .input(entryCreateInput)
       .mutation(async ({ ctx, input }) => {
         await assertPropertyAccess(input.propertyId, ctx.user.id, "editor");
@@ -441,13 +456,13 @@ export const financeRouter = router({
           ...entryValues(input),
         });
       }),
-    update: protectedProcedure
+    update: cashFlowProcedure
       .input(entryUpdateInput)
       .mutation(async ({ ctx, input }) => {
         await assertEntryAccess(input.entryId, input.propertyId, ctx.user.id);
         return updateFinancialEntry(input.entryId, entryValues(input));
       }),
-    delete: protectedProcedure
+    delete: cashFlowProcedure
       .input(
         z.object({
           propertyId: z.number().int().positive(),

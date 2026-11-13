@@ -14,6 +14,7 @@ import {
   userProfiles,
   users,
 } from "../drizzle/schema.js";
+import type { ModuleOverrides } from "../shared/modules.js";
 import { ENV } from "./_core/env.js";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -158,17 +159,22 @@ export async function getUserProfile(userId: number) {
   return result[0] ?? null;
 }
 
+/** Sem `moduleOverrides`, os ajustes de módulos já gravados são preservados. */
 export async function saveUserProfile(
   userId: number,
-  profileRole: (typeof userProfiles.$inferInsert)["profileRole"]
+  profileRole: (typeof userProfiles.$inferInsert)["profileRole"],
+  moduleOverrides?: ModuleOverrides
 ) {
   const db = await requireDb();
+  const changes = moduleOverrides
+    ? { profileRole, moduleOverrides }
+    : { profileRole };
   await db
     .insert(userProfiles)
-    .values({ userId, profileRole })
+    .values({ userId, ...changes })
     .onConflictDoUpdate({
       target: userProfiles.userId,
-      set: { profileRole, updatedAt: new Date() },
+      set: { ...changes, updatedAt: new Date() },
     });
   return getUserProfile(userId);
 }
