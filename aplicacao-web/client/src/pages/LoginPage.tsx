@@ -371,13 +371,13 @@ export default function LoginPage() {
                       />
                       Manter conectado
                     </label>
-                    <button
+                    {/* <button
                       type="button"
                       onClick={openForgotPassword}
                       className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
                     >
                       Esqueci minha senha
-                    </button>
+                    </button> */}
                   </div>
 
                   <button
@@ -401,7 +401,7 @@ export default function LoginPage() {
                 </form>
 
                 <p className="mt-7 text-sm text-graphite/60">
-                  {isSignUp
+                  {/* {isSignUp
                     ? "Já possui uma conta?"
                     : "Ainda não possui acesso?"}{" "}
                   <button
@@ -410,7 +410,7 @@ export default function LoginPage() {
                     className="font-semibold text-field underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field"
                   >
                     {isSignUp ? "Entrar" : "Criar conta"}
-                  </button>
+                  </button> */}
                 </p>
               </>
             )}
