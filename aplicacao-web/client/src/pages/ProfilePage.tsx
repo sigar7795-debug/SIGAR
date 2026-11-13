@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
+import { type ModuleId, moduleIds, MODULES, PERSONA_MODULES, type ProfileRole, resolveModules } from "@shared/modules";
 import { getNewPasswordError, getPasswordConfirmationError, PASSWORD_MIN_LENGTH, SAME_PASSWORD_ERROR } from "@shared/passwordPolicy";
-import { Bell, BriefcaseBusiness, Building2, GraduationCap, LockKeyhole, Pencil, Phone, Save, Sprout, UserCog, UsersRound } from "lucide-react";
+import { Bell, BriefcaseBusiness, Building2, GraduationCap, LayoutGrid, LockKeyhole, Pencil, Phone, Save, Sprout, UserCog, UsersRound } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -25,7 +26,8 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const profileQuery = trpc.finance.profile.get.useQuery();
   const utils = trpc.useUtils();
-  const [role, setRole] = useState<(typeof roles)[number]["value"]>("produtor");
+  const [role, setRole] = useState<ProfileRole>("produtor");
+  const [enabledModules, setEnabledModules] = useState<ModuleId[]>([...PERSONA_MODULES.produtor]);
   const [editing, setEditing] = useState(false);
   const [phone, setPhone] = useState("");
   const [organization, setOrganization] = useState("SIGAR Rural");
@@ -41,15 +43,31 @@ export default function ProfilePage() {
     onError: error => toast.error(error.message),
   });
 
+  // Recarrega o formulário só quando o que está gravado muda, para um refetch
+  // em segundo plano não descartar ajustes ainda não salvos.
+  const savedRole = profileQuery.data?.profileRole;
+  const savedModulesKey = savedRole ? resolveModules(savedRole, profileQuery.data?.moduleOverrides).join(",") : null;
   useEffect(() => {
-    if (profileQuery.data?.profileRole) setRole(profileQuery.data.profileRole);
-  }, [profileQuery.data?.profileRole]);
+    if (!savedRole || savedModulesKey === null) return;
+    setRole(savedRole);
+    setEnabledModules(moduleIds.filter(id => savedModulesKey.split(",").includes(id)));
+  }, [savedRole, savedModulesKey]);
 
   if (profileQuery.isLoading) return <LoadingState title="A carregar a configuração do perfil" />;
   if (profileQuery.isError) return <QueryErrorState onRetry={() => { void profileQuery.refetch(); }} />;
 
+  // A função é uma predefinição: trocá-la repõe os módulos padrão dela.
+  const selectRole = (nextRole: ProfileRole) => {
+    setRole(nextRole);
+    setEnabledModules([...PERSONA_MODULES[nextRole]]);
+  };
+
+  const toggleModule = (moduleId: ModuleId, enabled: boolean) => {
+    setEnabledModules(current => moduleIds.filter(id => (id === moduleId ? enabled : current.includes(id))));
+  };
+
   const saveChanges = () => {
-    saveProfile.mutate({ profileRole: role });
+    saveProfile.mutate({ profileRole: role, enabledModules });
   };
 
   return (
@@ -97,7 +115,7 @@ export default function ProfilePage() {
       <section className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
         <article className="border-t border-olive/35 pt-6">
           <div className="flex items-center gap-3"><BriefcaseBusiness className="h-5 w-5 text-olive" /><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">Função</p><h2 className="mt-1 font-display text-2xl font-bold">Como você usa o SIGAR?</h2></div></div>
-          <RadioGroup value={role} onValueChange={value => setRole(value as typeof role)} className="mt-6 grid border-y border-olive/30 sm:grid-cols-2">
+          <RadioGroup value={role} onValueChange={value => selectRole(value as ProfileRole)} className="mt-6 grid border-y border-olive/30 sm:grid-cols-2">
             {roles.map(item => {
               const Icon = item.icon;
               const active = item.value === role;
@@ -115,10 +133,32 @@ export default function ProfilePage() {
         <article className="border-t border-olive/35 pt-6">
           <div className="flex items-center gap-3"><Bell className="h-5 w-5 text-olive" /><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">Preferências</p><h2 className="mt-1 font-display text-2xl font-bold">Notificações</h2></div></div>
           <div className="mt-6 divide-y divide-olive/25 border-y border-olive/30">
-            <NotificationSetting label="Resumo por e-mail" description="Receba uma leitura periódica dos resultados." checked={emailNotifications} onCheckedChange={setEmailNotifications} />
-            <NotificationSetting label="Alertas financeiros" description="Acompanhe vencimentos e movimentos pendentes." checked={financialAlerts} onCheckedChange={setFinancialAlerts} />
+            <ToggleSetting label="Resumo por e-mail" description="Receba uma leitura periódica dos resultados." checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+            <ToggleSetting label="Alertas financeiros" description="Acompanhe vencimentos e movimentos pendentes." checked={financialAlerts} onCheckedChange={setFinancialAlerts} />
           </div>
         </article>
+      </section>
+
+      <section className="border-t border-olive/35 pt-6">
+        <div className="flex items-center gap-3"><LayoutGrid className="h-5 w-5 text-olive" /><div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-olive">Módulos</p><h2 className="mt-1 font-display text-2xl font-bold">O que aparece no seu menu</h2></div></div>
+        <p className="mt-3 max-w-2xl text-sm text-graphite/60">A função escolhida define o ponto de partida. Ligue ou desligue módulos conforme a sua rotina; Visão geral, Propriedades e Meu perfil ficam sempre disponíveis.</p>
+        <div className="mt-6 divide-y divide-olive/25 border-y border-olive/30">
+          {moduleIds.map(moduleId => {
+            const checked = enabledModules.includes(moduleId);
+            const matchesPreset = checked === PERSONA_MODULES[role].includes(moduleId);
+            return (
+              <ToggleSetting
+                key={moduleId}
+                label={MODULES[moduleId].label}
+                description={MODULES[moduleId].description}
+                tag={matchesPreset ? "Padrão da função" : "Ajustado por você"}
+                tagHighlighted={!matchesPreset}
+                checked={checked}
+                onCheckedChange={enabled => toggleModule(moduleId, enabled)}
+              />
+            );
+          })}
+        </div>
       </section>
 
       <div className="flex justify-end border-t border-olive/35 pt-6">
@@ -247,20 +287,30 @@ function PasswordField({
   );
 }
 
-function NotificationSetting({
+function ToggleSetting({
   label,
   description,
+  tag,
+  tagHighlighted,
   checked,
   onCheckedChange,
 }: {
   label: string;
   description: string;
+  tag?: string;
+  tagHighlighted?: boolean;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-5 py-4">
-      <div><p className="text-sm font-semibold">{label}</p><p className="mt-1 text-xs leading-5 text-graphite/55">{description}</p></div>
+      <div>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold">
+          {label}
+          {tag ? <span className={`border px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] ${tagHighlighted ? "border-field bg-field text-sand" : "border-olive/35 text-olive"}`}>{tag}</span> : null}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-graphite/55">{description}</p>
+      </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
     </div>
   );

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PropertySelector } from "@/components/PropertySelector";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useModules } from "@/hooks/useModules";
 import { useSelectedProperty } from "@/hooks/useSelectedProperty";
 import { formatCurrency, formatDate, formatPeriod } from "@/lib/formatters";
 import { trpc } from "@/lib/trpc";
@@ -37,6 +38,7 @@ export default function DashboardPage() {
   const { propertyId, setPropertyId } = useSelectedProperty();
   const propertiesQuery = trpc.finance.properties.list.useQuery();
   const profileQuery = trpc.finance.profile.get.useQuery();
+  const canUseCashFlow = useModules().hasModule("fluxo_caixa");
   const summaryQuery = trpc.finance.dashboard.summary.useQuery(
     { propertyId: propertyId ?? 0, range, referenceDate },
     { enabled: Boolean(propertyId) },
@@ -97,14 +99,16 @@ export default function DashboardPage() {
             >
               <Landmark className="mr-2 h-4 w-4" /> Cadastrar propriedade
             </Button>
-            <Button
-              type="button"
-              onClick={() => setLocation("/fluxo-de-caixa")}
-              disabled={!propertyId}
-              className="h-11 rounded-none bg-field font-semibold text-sand hover:bg-field/90"
-            >
-              <Plus className="mr-2 h-4 w-4" /> Adicionar lançamento
-            </Button>
+            {canUseCashFlow ? (
+              <Button
+                type="button"
+                onClick={() => setLocation("/fluxo-de-caixa")}
+                disabled={!propertyId}
+                className="h-11 rounded-none bg-field font-semibold text-sand hover:bg-field/90"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Adicionar lançamento
+              </Button>
+            ) : null}
           </div>
         }
       />
@@ -202,7 +206,7 @@ export default function DashboardPage() {
             <article className="border-t border-olive/35 pt-5">
               <div className="flex items-end justify-between gap-4">
                 <div><p className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-olive">Movimentação</p><h2 className="mt-2 font-display text-2xl font-bold">Atividades recentes</h2></div>
-                <button type="button" onClick={() => setLocation("/fluxo-de-caixa")} className="text-xs font-semibold text-field hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field">Abrir fluxo</button>
+                {canUseCashFlow ? <button type="button" onClick={() => setLocation("/fluxo-de-caixa")} className="text-xs font-semibold text-field hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field">Abrir fluxo</button> : null}
               </div>
               {recentEntries.length ? (
                 <div className="mt-5 divide-y divide-olive/25 border-y border-olive/25">

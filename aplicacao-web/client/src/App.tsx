@@ -6,6 +6,7 @@ import { useIsFetching } from "@tanstack/react-query";
 import { Route, Switch } from "wouter";
 import { EntryLoadingScreen } from "./components/entry-loading/EntryLoadingScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { ModuleGate } from "./components/ModuleGate";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import CashFlowPage from "./pages/CashFlowPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -25,11 +26,11 @@ function PropertiesRoute() {
 }
 
 function CashFlowRoute() {
-  return <DashboardLayout><CashFlowPage /></DashboardLayout>;
+  return <DashboardLayout><ModuleGate module="fluxo_caixa"><CashFlowPage /></ModuleGate></DashboardLayout>;
 }
 
 function InvestmentsRoute() {
-  return <DashboardLayout><InvestmentsPage /></DashboardLayout>;
+  return <DashboardLayout><ModuleGate module="investimentos"><InvestmentsPage /></ModuleGate></DashboardLayout>;
 }
 
 function ProfileRoute() {

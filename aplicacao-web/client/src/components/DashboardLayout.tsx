@@ -13,20 +13,23 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
+import { useModules } from "@/hooks/useModules";
 import { useSelectedProperty } from "@/hooks/useSelectedProperty";
 import { trpc } from "@/lib/trpc";
-import { Calculator, CalendarDays, Landmark, LayoutDashboard, LogOut, PanelLeft, TrendingUp, UserRound } from "lucide-react";
+import { type ModuleId, MODULES } from "@shared/modules";
+import { Calculator, CalendarDays, Landmark, LayoutDashboard, LogOut, type LucideIcon, PanelLeft, TrendingUp, UserRound } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { PropertySelector } from "./PropertySelector";
 
-const menuItems = [
+// Itens sem `module` são o escopo geral e aparecem para todas as contas.
+const menuItems: { icon: LucideIcon; label: string; path: string; module?: ModuleId }[] = [
   { icon: LayoutDashboard, label: "Visão geral", path: "/dashboard" },
   { icon: Landmark, label: "Propriedades", path: "/propriedades" },
-  { icon: Calculator, label: "Fluxo de caixa", path: "/fluxo-de-caixa" },
-  { icon: TrendingUp, label: "Investimentos", path: "/investimentos" },
+  { icon: Calculator, label: MODULES.fluxo_caixa.label, path: MODULES.fluxo_caixa.path, module: "fluxo_caixa" },
+  { icon: TrendingUp, label: MODULES.investimentos.label, path: MODULES.investimentos.path, module: "investimentos" },
   { icon: UserRound, label: "Meu perfil", path: "/perfil" },
 ];
 
@@ -74,8 +77,10 @@ function DashboardLayoutContent({
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const { hasModule } = useModules();
   const pathname = location.split("?")[0];
   const activeMenuItem = menuItems.find(item => item.path === pathname);
+  const visibleMenuItems = menuItems.filter(item => !item.module || hasModule(item.module));
   const currentDate = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "short",
@@ -134,7 +139,7 @@ function DashboardLayoutContent({
               Plataforma
             </p>
             <SidebarMenu className="gap-1 px-3">
-              {menuItems.map(item => {
+              {visibleMenuItems.map(item => {
                 const isActive = item.path === pathname;
                 return (
                   <SidebarMenuItem key={item.path}>

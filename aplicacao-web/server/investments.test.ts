@@ -11,6 +11,7 @@ const database = vi.hoisted(() => ({
   createInvestmentAlternative: vi.fn(),
   deleteInvestmentAlternative: vi.fn(),
   getEffectiveRole: vi.fn(),
+  getUserProfile: vi.fn(),
   listInvestmentAlternatives: vi.fn(),
   listPropertyEntries: vi.fn(),
   roleMeets: (role: string | null, minRole: string) =>

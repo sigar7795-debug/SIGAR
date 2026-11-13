@@ -6,6 +6,7 @@ import {
   decimal,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -15,6 +16,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { ModuleOverrides } from "../shared/modules.js";
 
 const createdAt = timestamp("createdAt", { withTimezone: true })
   .defaultNow()
@@ -64,6 +66,11 @@ export const userProfiles = pgTable(
       .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     profileRole: userProfileRole("profileRole").notNull(),
+    /** Só o que foge da predefinição do perfil (ver shared/modules.ts). */
+    moduleOverrides: jsonb("moduleOverrides")
+      .$type<ModuleOverrides>()
+      .notNull()
+      .default({}),
     createdAt,
     updatedAt,
   },

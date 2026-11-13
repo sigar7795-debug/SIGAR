@@ -13,6 +13,7 @@ const database = vi.hoisted(() => ({
   createOrRefreshInvite: vi.fn(),
   declineInvite: vi.fn(),
   getEffectiveRole: vi.fn(),
+  getUserProfile: vi.fn(),
   listPendingInvitesForEmail: vi.fn(),
   listPropertyMembers: vi.fn(),
   revokeMember: vi.fn(),

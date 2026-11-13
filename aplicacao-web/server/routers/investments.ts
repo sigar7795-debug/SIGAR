@@ -8,7 +8,7 @@ import {
   listPropertyEntries,
   updateInvestmentAlternative,
 } from "../db.js";
-import { protectedProcedure, router } from "../_core/trpc.js";
+import { router } from "../_core/trpc.js";
 import {
   COMPARISON_MAX_CAPITAL,
   COMPARISON_MAX_MONTHS,
@@ -25,7 +25,10 @@ import {
   roundHalfAwayFromZero,
   summarizeInvestment,
 } from "../../shared/investments.js";
+import { moduleProcedure } from "./moduleAccess.js";
 import { assertPropertyAccess } from "./propertyAccess.js";
+
+const investmentsProcedure = moduleProcedure("investimentos");
 
 const propertyIdInput = z.number().int().positive();
 const alternativeIdInput = z.number().int().positive();
@@ -139,14 +142,14 @@ async function loadComparisonData(
 }
 
 export const investmentsRouter = router({
-  list: protectedProcedure
+  list: investmentsProcedure
     .input(z.object({ propertyId: propertyIdInput }))
     .query(async ({ ctx, input }) => {
       await assertPropertyAccess(input.propertyId, ctx.user.id, "visualizador");
       const alternatives = await listInvestmentAlternatives(input.propertyId);
       return alternatives.map(withSimulation);
     }),
-  create: protectedProcedure
+  create: investmentsProcedure
     .input(alternativeCreateInput)
     .mutation(async ({ ctx, input }) => {
       const values = {
@@ -164,7 +167,7 @@ export const investmentsRouter = router({
       }
       return withSimulation(created);
     }),
-  update: protectedProcedure
+  update: investmentsProcedure
     .input(alternativeUpdateInput)
     .mutation(async ({ ctx, input }) => {
       const values = alternativeValues(input);
@@ -177,7 +180,7 @@ export const investmentsRouter = router({
       if (!updated) throw alternativeNotFound();
       return withSimulation(updated);
     }),
-  delete: protectedProcedure
+  delete: investmentsProcedure
     .input(
       z.object({
         propertyId: propertyIdInput,
@@ -193,7 +196,7 @@ export const investmentsRouter = router({
       if (!deleted) throw alternativeNotFound();
       return { id: input.alternativeId, deleted: true as const };
     }),
-  compare: protectedProcedure
+  compare: investmentsProcedure
     .input(compareInput)
     .query(async ({ ctx, input }) => {
       const period = getMonthWindow(input.startMonth, input.endMonth);
